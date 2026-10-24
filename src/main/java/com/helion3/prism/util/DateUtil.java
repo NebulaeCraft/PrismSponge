@@ -52,22 +52,22 @@ public class DateUtil {
 
         // Only show days if more than 1
         if( diff[0] >= 1 ) {
-            result += diff[0] + "d";
+            result += diff[0] + Translation.from("time.day");
         }
         // Only show hours if > 1
         if( diff[1] >= 1 ) {
-            result += diff[1] + "h";
+            result += diff[1] + Translation.from("time.hour");
         }
         // Only show minutes if > 1 and less than 60
         if( diff[2] > 1 && diff[2] < 60 ) {
-            result += diff[2] + "m";
+            result += diff[2] + Translation.from("time.minute");
         }
         if( !result.isEmpty() ) {
-            result += " ago";
+            result += Translation.from("time.ago");
         }
 
         if( diff[0] == 0 && diff[1] == 0 && diff[2] <= 1 ) {
-            result = "just now";
+            result = Translation.from("time.now");
         }
 
         return result;
@@ -84,7 +84,7 @@ public class DateUtil {
 
         final String[] matches = TypeUtil.pregMatchAll(relativeTimeDeclaration, shorthand);
         if (matches.length == 0) {
-            throw new IllegalArgumentException("Invalid date shorthand.");
+            throw new IllegalArgumentException(Translation.from("error.date"));
         }
 
         for (final String match : matches) {

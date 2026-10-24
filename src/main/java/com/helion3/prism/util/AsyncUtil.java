@@ -88,8 +88,7 @@ public class AsyncUtil {
                                                                                 .sendMessage(
                                                                                         Format
                                                                                                 .error(
-                                                                                                        e
-                                                                                                                .getMessage()));
+                                                                                                        Translation.error(e)));
                                                                         e.printStackTrace();
                                                                     }
                                                                 })

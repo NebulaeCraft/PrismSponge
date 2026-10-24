@@ -23,6 +23,8 @@
  */
 package com.helion3.prism.commands;
 
+import com.helion3.prism.util.Translation;
+
 import org.spongepowered.api.command.CommandException;
 import org.spongepowered.api.command.spec.CommandSpec;
 import org.spongepowered.api.entity.living.player.Player;
@@ -42,15 +44,15 @@ public class InspectCommand {
                 Player player = (Player) source;
                 if (Prism.getInstance().getActiveWands().contains(player.getUniqueId())) {
                     Prism.getInstance().getActiveWands().remove(player.getUniqueId());
-                    source.sendMessage(Format.heading("Inspection wand disabled."));
+                    source.sendMessage(Format.heading(Translation.from("inspect.disabled")));
                 } else {
                     Prism.getInstance().getActiveWands().add(player.getUniqueId());
-                    source.sendMessage(Format.heading("Inspection wand enabled."));
+                    source.sendMessage(Format.heading(Translation.from("inspect.enabled")));
                 }
 
                 return CommandResult.success();
             } else {
-                throw new CommandException(Format.error("You must be a player to use this command."));
+                throw new CommandException(Format.error(Translation.from("error.player-only")));
             }
         }).build();
     }

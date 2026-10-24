@@ -23,6 +23,8 @@
  */
 package com.helion3.prism.commands;
 
+import com.helion3.prism.util.Translation;
+
 import java.util.concurrent.CompletableFuture;
 
 import org.spongepowered.api.text.Text;
@@ -39,19 +41,19 @@ public class LookupCommand {
 
     public static CommandSpec getCommand() {
         return CommandSpec.builder()
-            .description(Text.of("Search event records."))
+            .description(Text.of(Translation.from("command.lookup")))
             .permission("prism.lookup")
-            .arguments(GenericArguments.optional(GenericArguments.remainingJoinedStrings(Text.of("parameters"))))
+            .arguments(GenericArguments.optional(GenericArguments.remainingJoinedStrings(Text.of(Translation.from("argument.parameters")))))
             .executor((source, args) -> {
                 // Create a new query session
                 final QuerySession session = new QuerySession(source);
 
                 String parameters = null;
-                if (args.<String>getOne("parameters").isPresent()) {
-                    parameters = args.<String>getOne("parameters").get();
+                if (args.<String>getOne(Translation.from("argument.parameters")).isPresent()) {
+                    parameters = args.<String>getOne(Translation.from("argument.parameters")).get();
                 }
 
-                source.sendMessage(Format.heading("Querying records..."));
+                source.sendMessage(Format.heading(Translation.from("query.running")));
 
                 try {
                     CompletableFuture<Void> future = session.newQueryFromArguments(parameters);
@@ -60,7 +62,7 @@ public class LookupCommand {
                         AsyncUtil.lookup(session);
                     });
                 } catch(Exception e) {
-                    String message = e.getMessage() == null ? "Unknown error. Please check the console." : e.getMessage();
+                    String message = Translation.error(e);
                     source.sendMessage(Format.error(Text.of(message)));
                     e.printStackTrace();
                 }

@@ -51,7 +51,7 @@ public class UndoCommand {
                         (source, args) -> {
                             if (!(source instanceof Player)) {
                                 throw new CommandException(
-                                        Format.error("You must be a player to use this command."));
+                                        Format.error(Translation.from("error.player-only")));
                             }
 
                             List<ActionableResult> results =
@@ -60,7 +60,7 @@ public class UndoCommand {
                                             .get(((Player) source).getUniqueId());
                             if (results == null || results.isEmpty()) {
                                 throw new CommandException(
-                                        Format.error("You have no valid actions to undo."));
+                                        Format.error(Translation.from("undo.empty")));
                             }
                             // Reverse the order of the list to undo last action.
                             final List<ActionableResult> reversed = Lists.reverse(results);

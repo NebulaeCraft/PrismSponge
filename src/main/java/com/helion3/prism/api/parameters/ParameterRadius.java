@@ -23,6 +23,8 @@
  */
 package com.helion3.prism.api.parameters;
 
+import com.helion3.prism.util.Translation;
+
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.regex.Pattern;
@@ -74,7 +76,7 @@ public class ParameterRadius extends SimpleParameterHandler {
             // Enforce max radius unless player has override perms
             if (radius > maxRadius && !player.hasPermission("prism.override.radius")) {
                 // @todo move this
-                player.sendMessage(Format.subduedHeading(String.format("Limiting radius to maximum of %d", maxRadius)));
+                player.sendMessage(Format.subduedHeading(String.format(Translation.from("query.radius-limit"), maxRadius)));
                 radius = maxRadius;
             }
 

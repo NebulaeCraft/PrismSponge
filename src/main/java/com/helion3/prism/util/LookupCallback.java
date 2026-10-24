@@ -35,7 +35,6 @@ import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import org.spongepowered.api.Sponge;
 import org.spongepowered.api.data.DataView;
-import org.spongepowered.api.service.pagination.PaginationList;
 import org.spongepowered.api.text.Text;
 import org.spongepowered.api.text.action.TextActions;
 import org.spongepowered.api.text.format.TextColors;
@@ -64,27 +63,23 @@ public class LookupCallback extends AsyncCallback {
         if (querySession.isTruncated()) {
             querySession
                     .getCommandSource()
-                    .sendMessage(Format.error("Results were limited by maximum-lookup."));
+                    .sendMessage(Format.error(Translation.from("query.limit")));
         }
-        PaginationList.Builder paginationBuilder = PaginationList.builder();
-        paginationBuilder.padding(Text.of(TextColors.DARK_GRAY, "="));
-        paginationBuilder.linesPerPage(15);
-        paginationBuilder.contents(messages);
-        paginationBuilder.build().sendTo(this.querySession.getCommandSource());
+        ChatPagination.send(querySession.getCommandSource(), messages);
     }
 
     @Override
     public void empty() {
         this.querySession
                 .getCommandSource()
-                .sendMessage(Format.error("Nothing found. See /pr ? for help."));
+                .sendMessage(Format.error(Translation.from("query.nothing")));
     }
 
     @Override
     public void error(Exception ex) {
         this.querySession
                 .getCommandSource()
-                .sendMessage(Format.error("An error occurred. Please see the console."));
+                .sendMessage(Format.error(Translation.from("error.generic")));
         Prism.getInstance()
                 .getLogger()
                 .error("Exception thrown by {}", getClass().getSimpleName(), ex);
@@ -92,24 +87,26 @@ public class LookupCallback extends AsyncCallback {
 
     private Text buildResult(Result result) {
         Text.Builder resultMessage = Text.builder();
-        resultMessage.append(Text.of(TextColors.DARK_AQUA, result.getSourceName(), " "));
-        resultMessage.append(Text.of(TextColors.WHITE, result.getEventVerb(), " "));
+        Text sourceName = Format.source(result.getSourceName(), result.data.contains(DataQueries.Player));
+        resultMessage.append(Text.of(TextColors.DARK_AQUA, sourceName, " "));
+        resultMessage.append(Text.of(TextColors.WHITE,
+                Translation.eventVerb(result.getEventId(), result.getEventVerb()), " "));
 
         Text.Builder hoverMessage = Text.builder();
         hoverMessage.append(Format.prefix(), Text.NEW_LINE);
         hoverMessage.append(
                 Text.of(
                         TextColors.DARK_GRAY,
-                        "Source: ",
+                        Translation.from("hover.source"),
                         TextColors.WHITE,
-                        result.getSourceName(),
+                        sourceName,
                         Text.NEW_LINE));
         hoverMessage.append(
                 Text.of(
                         TextColors.DARK_GRAY,
-                        "PrismEvent: ",
+                        Translation.from("hover.event"),
                         TextColors.WHITE,
-                        result.getEventName(),
+                        Translation.eventName(result.getEventId(), result.getEventName()),
                         Text.NEW_LINE));
 
         String quantity = result.data.getString(DataQueries.Quantity).orElse(null);
@@ -118,21 +115,21 @@ public class LookupCallback extends AsyncCallback {
             hoverMessage.append(
                     Text.of(
                             TextColors.DARK_GRAY,
-                            "Quantity: ",
+                            Translation.from("hover.quantity"),
                             TextColors.WHITE,
                             quantity,
                             Text.NEW_LINE));
         }
 
-        String target = result.data.getString(DataQueries.Target).orElse("Unknown");
+        String target = result.data.getString(DataQueries.Target).orElse(Translation.from("unknown"));
         if (StringUtils.isNotBlank(target)) {
             resultMessage.append(Text.of(TextColors.DARK_AQUA, Format.item(target, false), " "));
             hoverMessage.append(
                     Text.of(
                             TextColors.DARK_GRAY,
-                            "Target: ",
+                            Translation.from("hover.target"),
                             TextColors.WHITE,
-                            target,
+                            Format.item(target, false), " (", target, ")",
                             Text.NEW_LINE));
         }
 
@@ -146,14 +143,14 @@ public class LookupCallback extends AsyncCallback {
                                     hoverMessage.append(
                                             Text.of(
                                                     TextColors.DARK_GRAY,
-                                                    field + ": ",
+                                                    Translation.from("hover." + field),
                                                     TextColors.WHITE,
-                                                    value,
+                                                    field.equals("WEStatus") ? Translation.status(value) : value,
                                                     Text.NEW_LINE)));
         }
         if (StringUtils.isNotBlank(id)) {
             hoverMessage.append(
-                    Text.of(TextColors.DARK_GRAY, "Id: ", TextColors.WHITE, id, Text.NEW_LINE));
+                    Text.of(TextColors.DARK_GRAY, Translation.from("hover.id"), TextColors.WHITE, id, Text.NEW_LINE));
         }
 
         String container = result.data.getString(DataQueries.Container).orElse(null);
@@ -161,9 +158,9 @@ public class LookupCallback extends AsyncCallback {
             hoverMessage.append(
                     Text.of(
                             TextColors.DARK_GRAY,
-                            "Container: ",
+                            Translation.from("hover.container"),
                             TextColors.WHITE,
-                            container,
+                            Format.item(container, false), " (", container, ")",
                             Text.NEW_LINE));
         }
 
@@ -172,7 +169,7 @@ public class LookupCallback extends AsyncCallback {
             if (count > 0) {
                 resultMessage.append(Text.of(TextColors.GREEN, "x", count, " "));
                 hoverMessage.append(
-                        Text.of(TextColors.DARK_GRAY, "Count: ", TextColors.WHITE, count));
+                        Text.of(TextColors.DARK_GRAY, Translation.from("hover.count"), TextColors.WHITE, count));
             }
         }
 
@@ -183,7 +180,7 @@ public class LookupCallback extends AsyncCallback {
             hoverMessage.append(
                     Text.of(
                             TextColors.DARK_GRAY,
-                            "Time: ",
+                            Translation.from("hover.time"),
                             TextColors.WHITE,
                             resultComplete.getTime(),
                             Text.NEW_LINE));
@@ -203,7 +200,7 @@ public class LookupCallback extends AsyncCallback {
                 hoverMessage.append(
                         Text.of(
                                 TextColors.DARK_GRAY,
-                                "Location: ",
+                                Translation.from("hover.location"),
                                 TextColors.WHITE,
                                 Format.location(x, y, z, world, false)));
                 if (this.querySession.hasFlag(Flag.EXTENDED)) {
@@ -218,7 +215,7 @@ public class LookupCallback extends AsyncCallback {
                                     Text.NEW_LINE,
                                     Text.NEW_LINE,
                                     TextColors.GRAY,
-                                    "Click location to teleport."));
+                                    Translation.from("hover.teleport")));
                 }
             }
         }

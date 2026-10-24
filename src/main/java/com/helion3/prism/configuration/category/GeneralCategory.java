@@ -45,6 +45,17 @@ public class GeneralCategory {
     @Setting(value = "blacklist")
     private List<String> blacklist = Lists.newArrayList();
 
+    @Setting(value = "language", comment = "Chat language: zh_CN (Simplified Chinese) or en_US")
+    private String language = "zh_CN";
+
+    public String getLanguage() {
+        return language;
+    }
+
+    public void setLanguage(String language) {
+        this.language = language;
+    }
+
     public String getDateFormat() {
         return dateFormat;
     }

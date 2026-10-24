@@ -23,27 +23,77 @@
  */
 package com.helion3.prism.util;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.util.Locale;
+import java.util.Properties;
 
 public final class Translation {
 
-    // @todo this is mega temporary, should be moved to a language file
-    private static Map<String,String> lang = new HashMap<>();
+    private static final Properties english = load("en_US");
+    private static volatile Properties lang = load("zh_CN");
+    private static volatile Locale locale = Locale.SIMPLIFIED_CHINESE;
 
     private Translation() {}
 
-    /**
-     *
-     * @param key
-     * @return
-     */
-    public static String from(String key) {
-        if (lang.isEmpty()) {
-            lang.put("rollback.success", "{appliedCount} reversal(s).");
-            lang.put("rollback.success.withskipped", "{appliedCount} reversal(s). {skippedCount} skipped.");
-            lang.put("rollback.success.bonus", "It's like it never happened.");
+    /** Select the server's chat language. Unsupported languages fall back to English. */
+    public static void setLanguage(String language) {
+        boolean chinese = "zh_CN".equalsIgnoreCase(language) || "zh-CN".equalsIgnoreCase(language);
+        lang = load(chinese ? "zh_CN" : "en_US");
+        locale = chinese ? Locale.SIMPLIFIED_CHINESE : Locale.US;
+    }
+
+    public static Locale locale() {
+        return locale;
+    }
+
+    private static Properties load(String language) {
+        Properties messages = new Properties();
+        try (InputStream stream =
+                Translation.class.getResourceAsStream(
+                        "/assets/prism/lang/" + language + ".properties")) {
+            if (stream == null) {
+                throw new IllegalStateException("Missing Prism language resource: " + language);
+            }
+            messages.load(new InputStreamReader(stream, StandardCharsets.UTF_8));
+        } catch (IOException ex) {
+            throw new IllegalStateException("Cannot load Prism language resource: " + language, ex);
         }
-        return lang.get(key);
+        return messages;
+    }
+
+    /** Get a message, retaining the key if an extension has no translation. */
+    public static String from(String key) {
+        return lang.getProperty(key, english.getProperty(key, key));
+    }
+
+    public static String from(String key, Object... arguments) {
+        return String.format(Locale.ROOT, from(key), arguments);
+    }
+
+    public static String eventVerb(String id, String fallback) {
+        String key = "event." + id + ".verb";
+        return lang.getProperty(key, english.getProperty(key, fallback));
+    }
+
+    public static String eventName(String id, String fallback) {
+        String key = "event." + id + ".name";
+        return lang.getProperty(key, english.getProperty(key, fallback));
+    }
+
+    /** Parameter errors are already localized; implementation exceptions belong in the log. */
+    public static String error(Throwable error) {
+        if (error instanceof com.helion3.prism.api.parameters.ParameterException
+                && error.getMessage() != null) {
+            return error.getMessage();
+        }
+        return from("error.generic");
+    }
+
+    public static String status(String value) {
+        String key = "we.status." + value;
+        return lang.getProperty(key, english.getProperty(key, value));
     }
 }

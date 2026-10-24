@@ -24,6 +24,8 @@
 
 package com.helion3.prism.listeners;
 
+import com.helion3.prism.util.Translation;
+
 import com.helion3.prism.Prism;
 import com.helion3.prism.api.flags.Flag;
 import com.helion3.prism.api.query.ConditionGroup;
@@ -86,8 +88,9 @@ public class RequiredInteractListener {
 
         player.sendMessage(Text.of(
                 Format.prefix(), TextColors.GOLD,
-                "--- Inspecting ", Format.item(location.getBlockType().getId(), true),
-                " at ", location.getBlockX(), " ", location.getBlockY(), " ", location.getBlockZ(), " ---"));
+                Translation.from("inspect.title"), Format.item(location.getBlockType().getId(), true),
+                Text.NEW_LINE, TextColors.GOLD,
+                Translation.from("inspect.position", location.getBlockX(), location.getBlockY(), location.getBlockZ())));
 
         // Pass off to an async lookup helper
         AsyncUtil.lookup(session);
@@ -115,6 +118,6 @@ public class RequiredInteractListener {
             return;
         }
 
-        player.sendMessage(Format.error(Text.of("Cannot interact with entities while inspection is active!")));
+        player.sendMessage(Format.error(Text.of(Translation.from("inspect.entity"))));
     }
 }

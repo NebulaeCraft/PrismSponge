@@ -23,6 +23,8 @@
  */
 package com.helion3.prism.commands;
 
+import com.helion3.prism.util.Translation;
+
 import org.spongepowered.api.command.CommandResult;
 import org.spongepowered.api.command.spec.CommandSpec;
 import org.spongepowered.api.text.format.TextColors;
@@ -36,12 +38,12 @@ public class HelpCommand {
         return CommandSpec.builder()
             .permission("prism.help")
             .executor((source, args) -> {
-                source.sendMessage(Format.message("/pr [l|lookup] (params)", TextColors.GRAY, " - Query the database."));
-                source.sendMessage(Format.message("/pr near", TextColors.GRAY, " - Quick lookup of nearby activity."));
-                source.sendMessage(Format.message("/pr [rb|rollback] (params)", TextColors.GRAY, " - Reverse changes, limited by parameters."));
-                source.sendMessage(Format.message("/pr [rs|restore] (params)", TextColors.GRAY, " - Re-apply changes, limited by parameters."));
-                source.sendMessage(Format.message("/pr undo", TextColors.GRAY, " - Reverse your last rollback/restore."));
-                source.sendMessage(Format.message("/pr i", TextColors.GRAY, " - Toggle the inspection wand."));
+                source.sendMessage(Format.message("/pr [l|lookup] (" + Translation.from("argument.parameters") + ")", TextColors.GRAY, Translation.from("help.lookup")));
+                source.sendMessage(Format.message("/pr near", TextColors.GRAY, Translation.from("help.near")));
+                source.sendMessage(Format.message("/pr [rb|rollback] (" + Translation.from("argument.parameters") + ")", TextColors.GRAY, Translation.from("help.rollback")));
+                source.sendMessage(Format.message("/pr [rs|restore] (" + Translation.from("argument.parameters") + ")", TextColors.GRAY, Translation.from("help.restore")));
+                source.sendMessage(Format.message("/pr undo", TextColors.GRAY, Translation.from("help.undo")));
+                source.sendMessage(Format.message("/pr i", TextColors.GRAY, Translation.from("help.inspect")));
                 return CommandResult.success();
             }).build();
     }

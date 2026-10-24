@@ -30,6 +30,7 @@ import java.util.Optional;
 import com.helion3.prism.Prism;
 import com.helion3.prism.util.DataQueries;
 import com.helion3.prism.util.DateUtil;
+import com.helion3.prism.util.Translation;
 
 /**
  * Represents a complete copy of event record data from
@@ -39,7 +40,7 @@ import com.helion3.prism.util.DateUtil;
  */
 public class ResultComplete extends Result {
 
-    private final SimpleDateFormat dateFormatter = new SimpleDateFormat(Prism.getInstance().getConfig().getGeneralCategory().getDateFormat());
+    private final SimpleDateFormat dateFormatter = new SimpleDateFormat(Prism.getInstance().getConfig().getGeneralCategory().getDateFormat(), Translation.locale());
 
     /**
      * Returns a user-friendly relative "time since" value.

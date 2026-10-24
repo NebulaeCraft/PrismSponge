@@ -23,6 +23,8 @@
  */
 package com.helion3.prism.worldedit;
 
+import com.helion3.prism.util.Translation;
+
 import com.helion3.prism.Prism;
 import com.helion3.prism.api.storage.*;
 import com.helion3.prism.storage.h2.H2StorageAdapter;
@@ -215,7 +217,7 @@ public final class WorldEditIntegration implements AutoCloseable {
                             source ->
                                     source.sendMessage(
                                             com.helion3.prism.util.Format.error(
-                                                    "Prism cannot audit this WE command: capture bridge unavailable or regeneration/offline path.")));
+                                                    Translation.from("we.unavailable"))));
         }
     }
 

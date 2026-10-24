@@ -24,6 +24,8 @@
 
 package com.helion3.prism.commands;
 
+import com.helion3.prism.util.Translation;
+
 import com.helion3.prism.Prism;
 import com.helion3.prism.api.flags.Flag;
 import com.helion3.prism.api.query.QuerySession;
@@ -52,24 +54,24 @@ public class ApplierCommand {
     public static CommandSpec getCommand(Sort sort) {
         return CommandSpec.builder()
                 .permission("prism.rollback")
-                .arguments(GenericArguments.remainingJoinedStrings(Text.of("parameters")))
+                .arguments(GenericArguments.remainingJoinedStrings(Text.of(Translation.from("argument.parameters"))))
                 .executor(
                         (source, args) -> {
                             // Create a new query session
                             final QuerySession session = new QuerySession(source);
                             session.addFlag(Flag.NO_GROUP);
                             try {
-                                source.sendMessage(Format.heading("Querying records..."));
+                                source.sendMessage(Format.heading(Translation.from("query.running")));
 
                                 CompletableFuture<Void> future =
                                         session.newQueryFromArguments(
-                                                args.<String>getOne("parameters").get());
+                                                args.<String>getOne(Translation.from("argument.parameters")).get());
                                 // Ignore user order flag, if used, for proper rollback/restore
                                 // order to be used.
                                 session.setSortBy(sort);
                                 future.thenAccept((v) -> runApplier(session, sort));
                             } catch (Exception e) {
-                                source.sendMessage(Format.error(Text.of(e.getMessage())));
+                                source.sendMessage(Format.error(Text.of(Translation.error(e))));
                                 e.printStackTrace();
                             }
 
@@ -118,7 +120,7 @@ public class ApplierCommand {
                                 session.getCommandSource()
                                         .sendMessage(
                                                 Format.error(
-                                                        "An error occurred. Please see the console."));
+                                                        Translation.from("error.generic")));
                                 Prism.getInstance()
                                         .getLogger()
                                         .error(
@@ -134,7 +136,7 @@ public class ApplierCommand {
     private static void applyResults(QuerySession session, Sort sort, List<Result> results) {
         CommandSource source = session.getCommandSource();
         if (results.isEmpty()) {
-            source.sendMessage(Format.error("No results."));
+            source.sendMessage(Format.error(Translation.from("query.empty")));
             return;
         }
 
@@ -142,7 +144,7 @@ public class ApplierCommand {
         if (session.isTruncated()) {
             source.sendMessage(
                     Format.error(
-                            "Results were limited by maximum-actionable; only the matching blocks returned will be changed."));
+                            Translation.from("query.actionable-limit")));
         }
         com.helion3.prism.worldedit.TickBatch.apply(
                 results.size(),
@@ -158,7 +160,7 @@ public class ApplierCommand {
                             }
                         }
                     } catch (Exception e) {
-                        source.sendMessage(Format.error(Text.of(e.getMessage())));
+                        source.sendMessage(Format.error(Text.of(Translation.error(e))));
                         e.printStackTrace();
                     }
                 },
@@ -187,7 +189,7 @@ public class ApplierCommand {
             }
 
             if (changes > 0) {
-                source.sendMessage(Format.bonus("Cleaning area..."));
+                source.sendMessage(Format.bonus(Translation.from("clean.running")));
             }
         }
         sendResults(source, actionResults);

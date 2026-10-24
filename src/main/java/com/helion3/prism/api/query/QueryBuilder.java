@@ -23,6 +23,8 @@
  */
 package com.helion3.prism.api.query;
 
+import com.helion3.prism.util.Translation;
+
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import java.util.ArrayList;
@@ -135,7 +137,7 @@ public class QueryBuilder {
 
             // @todo should move this
             if (defaultsUsed.length() > 0) {
-                session.getCommandSource().sendMessage(Format.subduedHeading(Text.of(String.format("Defaults used: %s", defaultsUsed.toString()))));
+                session.getCommandSource().sendMessage(Format.subduedHeading(Text.of(String.format(Translation.from("query.defaults"), defaultsUsed.toString()))));
             }
         }
 
@@ -167,19 +169,19 @@ public class QueryBuilder {
         // Find a handler
         Optional<FlagHandler> optionalHandler = Prism.getInstance().getFlagHandler(flag);
         if (!optionalHandler.isPresent()) {
-            throw new ParameterException("\"" + flag + "\" is not a valid flag. No handler found.");
+            throw new ParameterException(Translation.from("error.flag", flag));
         }
 
         FlagHandler handler = optionalHandler.get();
 
         // Allows this command source?
         if (!handler.acceptsSource(session.getCommandSource())) {
-            throw new ParameterException("This command source may not use the \"" + flag + "\" flag.");
+            throw new ParameterException(Translation.from("error.flag-source", flag));
         }
 
         // Validate value
         if (value != null && !handler.acceptsValue(value)) {
-            throw new ParameterException("Invalid value \"" + value + "\" for parameter \"" + flag + "\".");
+            throw new ParameterException(Translation.from("error.value", value, flag));
         }
 
         return handler.process(session, flag, value, query);
@@ -217,25 +219,25 @@ public class QueryBuilder {
     private static Optional<CompletableFuture<?>> parseParameterFromArgument(QuerySession session, Query query, Pair<String, String> parameter) throws ParameterException {
         // Simple validation
         if (parameter.getKey().length() <= 0 || parameter.getValue().length() <= 0) {
-            throw new ParameterException("Invalid empty value for parameter \"" + parameter.getKey() + "\".");
+            throw new ParameterException(Translation.from("error.empty", parameter.getKey()));
         }
 
         // Find a handler
         Optional<ParameterHandler> optionalHandler = Prism.getInstance().getParameterHandler(parameter.getKey());
         if (!optionalHandler.isPresent()) {
-            throw new ParameterException("\"" + parameter.getKey() + "\" is not a valid parameter. No handler found.");
+            throw new ParameterException(Translation.from("error.parameter", parameter.getKey()));
         }
 
         ParameterHandler handler = optionalHandler.get();
 
         // Allows this command source?
         if (!handler.acceptsSource(session.getCommandSource())) {
-            throw new ParameterException("This command source may not use the \"" + parameter.getKey() + "\" parameter.");
+            throw new ParameterException(Translation.from("error.parameter-source", parameter.getKey()));
         }
 
         // Validate value
         if (!handler.acceptsValue(parameter.getValue())) {
-            throw new ParameterException("Invalid value \"" + parameter.getValue() + "\" for parameter \"" + parameter.getKey() + "\".");
+            throw new ParameterException(Translation.from("error.value", parameter.getValue(), parameter.getKey()));
         }
 
         return handler.process(session, parameter.getKey(), parameter.getValue(), query);

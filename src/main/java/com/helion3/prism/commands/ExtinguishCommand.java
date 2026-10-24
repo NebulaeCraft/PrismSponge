@@ -23,6 +23,8 @@
  */
 package com.helion3.prism.commands;
 
+import com.helion3.prism.util.Translation;
+
 import org.spongepowered.api.block.BlockTypes;
 import org.spongepowered.api.command.CommandException;
 import org.spongepowered.api.command.CommandResult;
@@ -40,17 +42,17 @@ public class ExtinguishCommand {
     public static CommandSpec getCommand() {
         return CommandSpec.builder()
             .permission("prism.extinguish")
-            .arguments(GenericArguments.integer(Text.of("radius")))
+            .arguments(GenericArguments.integer(Text.of(Translation.from("argument.radius"))))
             .executor((source, args) -> {
                 if (!(source instanceof Player)) {
-                    throw new CommandException(Format.error("You must be a player to use this command."));
+                    throw new CommandException(Format.error(Translation.from("error.player-only")));
                 }
 
-                int radius = args.<Integer>getOne("radius").get();
+                int radius = args.<Integer>getOne(Translation.from("argument.radius")).get();
                 int changes = WorldUtil.removeAroundFromLocation(
                     BlockTypes.FIRE, ((Player) source).getLocation(), radius);
 
-                source.sendMessage(Format.message(String.format("Removed %d matches within %d blocks", changes, radius)));
+                source.sendMessage(Format.message(String.format(Translation.from("extinguish.result"), changes, radius)));
 
                 return CommandResult.success();
             })

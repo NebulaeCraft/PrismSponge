@@ -23,6 +23,8 @@
  */
 package com.helion3.prism.commands;
 
+import com.helion3.prism.util.Translation;
+
 import java.util.List;
 
 import com.helion3.prism.api.query.Sort;
@@ -63,17 +65,17 @@ public class PrismCommands {
                 // Check permission here, so the node doesn't apply to all child commands
                 if (source.hasPermission("prism.info")) {
                     source.sendMessage(Text.of(
-                            Format.heading(TextColors.GRAY, "By ", TextColors.GOLD, "viveleroi", TextColors.GRAY, ".\n"),
-                            TextColors.DARK_AQUA, "Tracking so good the NSA stole our name.\n",
-                            TextColors.GRAY, "Help: ", TextColors.WHITE, "/pr ?\n",
-                            TextColors.GRAY, "IRC: ", TextColors.WHITE, "irc.esper.net #prism\n",
-                            TextColors.GRAY, "Site: ", Format.url(Reference.WEBSITE), "\n",
-                            TextColors.GRAY, "Source: ", Format.url(Reference.SOURCE)
+                            Format.heading(TextColors.GRAY, Translation.from("info.author"), TextColors.GOLD, "viveleroi", TextColors.GRAY, ".\n"),
+                            TextColors.DARK_AQUA, Translation.from("info.tagline"),
+                            TextColors.GRAY, Translation.from("info.help"), TextColors.WHITE, "/pr ?\n",
+                            TextColors.GRAY, Translation.from("info.irc"), TextColors.WHITE, "irc.esper.net #prism\n",
+                            TextColors.GRAY, Translation.from("info.site"), Format.url(Reference.WEBSITE), "\n",
+                            TextColors.GRAY, Translation.from("info.source"), Format.url(Reference.SOURCE)
                     ));
 
                     return CommandResult.success();
                 } else {
-                    throw new CommandException(Format.error("You do not have permission to use this command."));
+                    throw new CommandException(Format.error(Translation.from("error.permission")));
                 }
             })
             .children(builder.build()).build();

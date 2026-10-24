@@ -27,6 +27,10 @@ package com.helion3.prism.util;
 import static com.google.common.base.Preconditions.*;
 
 import org.apache.commons.lang3.StringUtils;
+import org.spongepowered.api.Sponge;
+import org.spongepowered.api.block.BlockType;
+import org.spongepowered.api.item.ItemType;
+import org.spongepowered.api.entity.EntityType;
 import org.spongepowered.api.entity.living.player.Player;
 import org.spongepowered.api.text.Text;
 import org.spongepowered.api.text.action.TextActions;
@@ -195,7 +199,17 @@ public class Format {
         checkNotNull(id);
 
         Text.Builder textBuilder = Text.builder();
-        if (StringUtils.contains(id, ":")) {
+        // Keep translation components intact so Minecraft can use the client's language pack.
+        java.util.Optional<BlockType> block = Sponge.getRegistry().getType(BlockType.class, id);
+        java.util.Optional<ItemType> item = Sponge.getRegistry().getType(ItemType.class, id);
+        java.util.Optional<EntityType> entity = Sponge.getRegistry().getType(EntityType.class, id);
+        if (block.isPresent()) {
+            textBuilder.append(Text.of(block.get().getTranslation()));
+        } else if (item.isPresent()) {
+            textBuilder.append(Text.of(item.get().getTranslation()));
+        } else if (entity.isPresent()) {
+            textBuilder.append(Text.of(entity.get().getTranslation()));
+        } else if (StringUtils.contains(id, ":")) {
             textBuilder.append(Text.of(StringUtils.substringAfter(id, ":")));
         } else {
             textBuilder.append(Text.of(id));
@@ -206,6 +220,22 @@ public class Format {
         }
 
         return textBuilder.build();
+    }
+
+    /** Localize built-in causes and entity names without translating player names. */
+    public static Text source(String name, boolean player) {
+        if (player) {
+            return Text.of(name);
+        }
+        if ("environment".equals(name)) {
+            return Text.of(Translation.from("source.environment"));
+        }
+        if ("unknown".equalsIgnoreCase(name)) {
+            return Text.of(Translation.from("unknown"));
+        }
+        return Sponge.getRegistry().getType(EntityType.class, name.toLowerCase(java.util.Locale.ROOT))
+                .map(type -> (Text) Text.of(type.getTranslation()))
+                .orElseGet(() -> Text.of(name));
     }
 
     /**
@@ -223,7 +253,7 @@ public class Format {
         Text.Builder textBuilder = Text.builder();
         textBuilder.append(Text.of("(x:", x, " y:", y, " z:", z));
         if (world != null) {
-            textBuilder.append(Text.of(" world:", world.getName()));
+            textBuilder.append(Text.of(Translation.from("location.world"), world.getName()));
 
             if (clickAction) {
                 textBuilder.onClick(TextActions.executeCallback(commandSource -> {

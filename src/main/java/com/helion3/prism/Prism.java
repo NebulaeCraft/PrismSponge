@@ -127,6 +127,7 @@ public final class Prism {
     @Listener
     public void onPreInitialization(GamePreInitializationEvent event) {
         getConfiguration().loadConfiguration();
+        com.helion3.prism.util.Translation.setLanguage(getConfig().getGeneralCategory().getLanguage());
     }
 
     @Listener
