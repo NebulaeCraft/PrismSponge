@@ -61,6 +61,6 @@ public class MySQLQuery extends SQLQuery {
         // Get Sorting order.
         builder.order("created " + session.getSortBy().getString());
 
-        return builder.build();
+        return builder.limit(session.getQuery().getLimit()).build();
     }
 }

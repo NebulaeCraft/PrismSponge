@@ -83,66 +83,73 @@ public class ApplierCommand {
      */
     public static void runApplier(QuerySession session, Sort sort) {
         session.getQuery().setLimit(Prism.getInstance().getConfig().getLimitCategory().getMaximumActionable());
+        Task.builder().async().execute(() -> {
+            try {
+                CompletableFuture<List<Result>> futureResults = Prism.getInstance().getStorageAdapter().records().query(session, false);
+                futureResults.whenComplete((results, error) -> finishQuery(session, sort, results, error));
+            } catch (Exception e) {
+                finishQuery(session, sort, null, e);
+            }
+        }).submit(Prism.getInstance().getPluginContainer());
+    }
+
+    /**
+     * Return to the server thread before accessing players or changing the world.
+     */
+    private static void finishQuery(QuerySession session, Sort sort, List<Result> results, Throwable error) {
+        Task.builder().execute(() -> {
+            if (error != null) {
+                session.getCommandSource().sendMessage(Format.error("An error occurred. Please see the console."));
+                Prism.getInstance().getLogger().error("Failed to query records for rollback/restore", error);
+                return;
+            }
+            applyResults(session, sort, results);
+        }).submit(Prism.getInstance().getPluginContainer());
+    }
+
+    private static void applyResults(QuerySession session, Sort sort, List<Result> results) {
         CommandSource source = session.getCommandSource();
-        try {
-            List<ActionableResult> actionResults = new ArrayList<>();
-            // Iterate query results
-            CompletableFuture<List<Result>> futureResults = Prism.getInstance().getStorageAdapter().records().query(session, false);
-            futureResults.thenAccept(results -> {
-                if (results.isEmpty()) {
-                    source.sendMessage(Format.error("No results."));
-                } else {
-                    try {
-                        // Iterate record results
-                        Task.builder().execute(() -> {
-                            results.forEach(result -> {
-                                try {
-                                    if (result instanceof Actionable) {
-
-                                        Actionable actionable = (Actionable) result;
-
-                                        if (sort.equals(Sort.NEWEST_FIRST)) {
-                                            actionResults.add(actionable.rollback());
-                                        } else {
-                                            actionResults.add(actionable.restore());
-                                        }
-                                    }
-                                } catch (Exception e) {
-                                    source.sendMessage(Format.error(Text.of(e.getMessage())));
-                                    e.printStackTrace();
-                                }
-                            });
-                            sendResults(source, actionResults);
-                        }).submit(Prism.getInstance());
-                    } catch(Exception e) {
-                        e.printStackTrace();
-                    }
-
-                    if (source instanceof Player) {
-                        int changes = 0;
-
-                        if (session.hasFlag(Flag.CLEAN)) {
-                            changes += WorldUtil.removeIllegalBlocks(
-                                ((Player) source).getLocation(), session.getRadius());
-                            changes += WorldUtil.removeItemEntitiesAroundLocation(((Player) source).getLocation(), session.getRadius());
-                        }
-
-                        if (session.hasFlag(Flag.DRAIN)) {
-                            changes += WorldUtil.removeLiquidsAroundLocation(
-                                ((Player) source).getLocation(), session.getRadius());
-                        }
-
-                        if (changes > 0) {
-                            source.sendMessage(Format.bonus("Cleaning area..."));
-                        }
-                    }
-
-                }
-            });
-        } catch (Exception e) {
-            source.sendMessage(Format.error(Text.of(e.getMessage())));
-            e.printStackTrace();
+        if (results.isEmpty()) {
+            source.sendMessage(Format.error("No results."));
+            return;
         }
+
+        List<ActionableResult> actionResults = new ArrayList<>();
+        for (Result result : results) {
+            try {
+                if (result instanceof Actionable) {
+                    Actionable actionable = (Actionable) result;
+                    if (sort.equals(Sort.NEWEST_FIRST)) {
+                        actionResults.add(actionable.rollback());
+                    } else {
+                        actionResults.add(actionable.restore());
+                    }
+                }
+            } catch (Exception e) {
+                source.sendMessage(Format.error(Text.of(e.getMessage())));
+                e.printStackTrace();
+            }
+        }
+
+        if (source instanceof Player) {
+            int changes = 0;
+
+            if (session.hasFlag(Flag.CLEAN)) {
+                changes += WorldUtil.removeIllegalBlocks(
+                    ((Player) source).getLocation(), session.getRadius());
+                changes += WorldUtil.removeItemEntitiesAroundLocation(((Player) source).getLocation(), session.getRadius());
+            }
+
+            if (session.hasFlag(Flag.DRAIN)) {
+                changes += WorldUtil.removeLiquidsAroundLocation(
+                    ((Player) source).getLocation(), session.getRadius());
+            }
+
+            if (changes > 0) {
+                source.sendMessage(Format.bonus("Cleaning area..."));
+            }
+        }
+        sendResults(source, actionResults);
     }
 
     private static void sendResults(CommandSource source, List<ActionableResult> actionResults) {

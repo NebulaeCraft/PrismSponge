@@ -54,6 +54,6 @@ public class H2SQLQuery extends SQLQuery {
             query.order("created " + session.getSortBy().getString());
         }
 
-        return query.build();
+        return query.limit(session.getQuery().getLimit()).build();
     }
 }

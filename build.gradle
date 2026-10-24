@@ -78,6 +78,8 @@ dependencies {
     shadow("org.mariadb.jdbc:mariadb-java-client:2.5.4")
     provided("com.zaxxer:HikariCP:3.4.2")
     testCompile("org.junit.jupiter:junit-jupiter-engine:5.5.1")
+    testCompile("com.h2database:h2:1.4.200")
+    testCompile("org.mockito:mockito-core:2.28.2")
     shadow("org.mongodb:mongo-java-driver:3.10.2")
     testCompile("org.mongodb:mongo-java-driver:3.10.2")
     annotationProcessor("org.spongepowered:spongeapi:7.1.0")

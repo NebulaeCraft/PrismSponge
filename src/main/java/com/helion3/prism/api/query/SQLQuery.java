@@ -69,6 +69,7 @@ public class SQLQuery {
         private List<String> orderBy = new ArrayList<>();
         private List<String> unhexCols = new ArrayList<>();
         private String table;
+        private Integer limit;
         private Map<String, String> joins = new HashMap<>();
         private List<Condition> conditions = new ArrayList<>();
         private Map<DataQuery, QueryValueMutator> valueMutators = new HashMap<>();
@@ -178,6 +179,20 @@ public class SQLQuery {
         }
 
         /**
+         * Limit the number of rows returned after grouping and sorting.
+         *
+         * @param limit Maximum number of result rows, greater than zero.
+         * @return Builder
+         */
+        public Builder limit(int limit) {
+            if (limit <= 0) {
+                throw new IllegalArgumentException("Query limit must be greater than zero.");
+            }
+            this.limit = limit;
+            return this;
+        }
+
+        /**
          * Build the final query string.
          *
          * @return String
@@ -210,6 +225,10 @@ public class SQLQuery {
             // Order By
             if (!orderBy.isEmpty()) {
                 sql.append("ORDER BY ").append(String.join(", ", orderBy)).append(" ");
+            }
+
+            if (limit != null) {
+                sql.append("LIMIT ").append(limit).append(" ");
             }
 
             return new SQLQuery(sql.toString().trim());
