@@ -59,6 +59,13 @@ import com.helion3.prism.storage.mongodb.MongoStorageAdapter;
 import com.helion3.prism.storage.mysql.MySQLStorageAdapter;
 import com.helion3.prism.util.PrismEvents;
 import com.helion3.prism.util.Reference;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.spongepowered.api.Sponge;
@@ -74,14 +81,6 @@ import org.spongepowered.api.plugin.Plugin;
 import org.spongepowered.api.plugin.PluginContainer;
 import org.spongepowered.api.scheduler.Task;
 
-import java.nio.file.Path;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.TimeUnit;
-
 /**
  * Prism is an event logging + rollback/restore engine for Minecraft servers.
  *
@@ -93,17 +92,14 @@ import java.util.concurrent.TimeUnit;
         version = Reference.VERSION,
         description = Reference.DESCRIPTION,
         authors = Reference.AUTHORS,
-        url = Reference.WEBSITE
-)
+        url = Reference.WEBSITE)
 public final class Prism {
 
     private static Prism instance;
 
-    @Inject
-    private PluginContainer pluginContainer;
+    @Inject private PluginContainer pluginContainer;
 
-    @Inject
-    private Logger logger;
+    @Inject private Logger logger;
 
     @Inject
     @DefaultConfig(sharedRoot = false)
@@ -111,6 +107,7 @@ public final class Prism {
 
     private Configuration configuration;
     private StorageAdapter storageAdapter;
+    private com.helion3.prism.worldedit.WorldEditIntegration worldEditIntegration;
 
     private final Set<UUID> activeWands = Sets.newHashSet();
     private final FilterList filterList = new FilterList(FilterMode.BLACKLIST);
@@ -158,7 +155,8 @@ public final class Prism {
         Sponge.getEventManager().registerListeners(getPluginContainer(), new InventoryListener());
 
         // Events required for internal operation
-        Sponge.getEventManager().registerListeners(getPluginContainer(), new RequiredInteractListener());
+        Sponge.getEventManager()
+                .registerListeners(getPluginContainer(), new RequiredInteractListener());
     }
 
     @Listener
@@ -182,6 +180,20 @@ public final class Prism {
 
             Preconditions.checkState(getStorageAdapter().connect());
 
+            if (getConfig().getWorldEditCategory().isEnabled()) {
+                if (storageAdapter instanceof H2StorageAdapter
+                        || storageAdapter instanceof MySQLStorageAdapter) {
+                    worldEditIntegration =
+                            new com.helion3.prism.worldedit.WorldEditIntegration(
+                                    storageAdapter, getPath().getParent().resolve("worldedit"));
+                    storageAdapter = worldEditIntegration.wrap(storageAdapter);
+                } else {
+                    getLogger()
+                            .warn(
+                                    "WorldEdit capture is not enabled for MongoDB; use H2 or MySQL/MariaDB for WE recording.");
+                }
+            }
+
             // Initialize the recording queue manager
             Task.builder()
                     .async()
@@ -202,6 +214,17 @@ public final class Prism {
         Sponge.getScheduler().getScheduledTasks(getInstance()).forEach(Task::cancel);
 
         if (getStorageAdapter() != null) {
+            if (worldEditIntegration != null) {
+                try {
+                    worldEditIntegration.close();
+                } catch (Exception failure) {
+                    getLogger()
+                            .error(
+                                    "Cannot stop WE recording safely; leaving SQL pool open for pending writes",
+                                    failure);
+                    return;
+                }
+            }
             // Flush any pending records
             // If the scheduled task is still running this will block until it completes
             recordingQueueManager.run();
@@ -338,5 +361,4 @@ public final class Prism {
         Preconditions.checkNotNull(parameterHandler);
         return getParameterHandlers().add(parameterHandler);
     }
-
 }

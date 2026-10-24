@@ -44,23 +44,41 @@ public class MySQLQuery extends SQLQuery {
         Builder builder = SQLQuery.builder().select().from(tablePrefix + "records AS r");
         if (!session.hasFlag(Flag.NO_GROUP)) {
             builder.group(
-                    DataQueries.EventName.toString(),
-                    DataQueries.Target.toString(),
-                    DataQueries.Player.toString(),
-                    DataQueries.Cause.toString(),
-                    "DATE_FORMAT(created, '%Y-%m-%d')"
-            ).col("COUNT(*) AS total").col("DATE_FORMAT(created, '%Y-%m-%d') as created");
+                            DataQueries.EventName.toString(),
+                            DataQueries.Target.toString(),
+                            DataQueries.Player.toString(),
+                            DataQueries.Cause.toString(),
+                            "DATE_FORMAT(created, '%Y-%m-%d')")
+                    .col("COUNT(*) AS total")
+                    .col("DATE_FORMAT(created, '%Y-%m-%d') as created");
         } else {
-            builder.col("*").leftJoin(tablePrefix + "extra AS e", "r.id = e.record_id");
+            builder.col("r.*")
+                    .col("e.json")
+                    .leftJoin(tablePrefix + "extra AS e", "r.id = e.record_id");
         }
 
-        builder.hex(DataQueries.Player.toString(), DataQueries.WorldUuid.toString()).conditions(session.getQuery().getConditions());
-        builder.valueMutator(DataQueries.Player, value -> "UNHEX('" + TypeUtil.uuidStringToDbString(value) + "')");
-        builder.valueMutator(DataQueries.Location.then(DataQueries.WorldUuid), value -> "UNHEX('" + TypeUtil.uuidStringToDbString(value) + "')");
+        builder.hex(DataQueries.Player.toString(), DataQueries.WorldUuid.toString())
+                .conditions(session.getQuery().getConditions());
+        builder.valueMutator(
+                DataQueries.Player,
+                value -> "UNHEX('" + TypeUtil.uuidStringToDbString(value) + "')");
+        builder.valueMutator(
+                DataQueries.Location.then(DataQueries.WorldUuid),
+                value -> "UNHEX('" + TypeUtil.uuidStringToDbString(value) + "')");
 
         // Get Sorting order.
-        builder.order("created " + session.getSortBy().getString());
+        if (session.hasFlag(Flag.NO_GROUP)) {
+            String direction = session.getSortBy().getString();
+            builder.order(
+                    "COALESCE(r.Captured,r.Created*1000) " + direction,
+                    "r.CaptureSequence " + direction,
+                    "r.id " + direction);
+        } else {
+            builder.order("created " + session.getSortBy().getString());
+        }
 
-        return builder.limit(session.getQuery().getLimit()).build();
+        return builder.limit(session.getQuery().getLimit())
+                .offset(session.getQuery().getOffset())
+                .build();
     }
 }

@@ -30,6 +30,8 @@ import com.helion3.prism.api.query.QuerySession;
 import com.helion3.prism.api.records.Result;
 import com.helion3.prism.api.records.ResultAggregate;
 import com.helion3.prism.api.records.ResultComplete;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import org.spongepowered.api.Sponge;
 import org.spongepowered.api.data.DataView;
@@ -38,9 +40,6 @@ import org.spongepowered.api.text.Text;
 import org.spongepowered.api.text.action.TextActions;
 import org.spongepowered.api.text.format.TextColors;
 import org.spongepowered.api.world.World;
-
-import java.util.ArrayList;
-import java.util.List;
 
 public class LookupCallback extends AsyncCallback {
 
@@ -62,6 +61,11 @@ public class LookupCallback extends AsyncCallback {
             return;
         }
 
+        if (querySession.isTruncated()) {
+            querySession
+                    .getCommandSource()
+                    .sendMessage(Format.error("Results were limited by maximum-lookup."));
+        }
         PaginationList.Builder paginationBuilder = PaginationList.builder();
         paginationBuilder.padding(Text.of(TextColors.DARK_GRAY, "="));
         paginationBuilder.linesPerPage(15);
@@ -71,13 +75,19 @@ public class LookupCallback extends AsyncCallback {
 
     @Override
     public void empty() {
-        this.querySession.getCommandSource().sendMessage(Format.error("Nothing found. See /pr ? for help."));
+        this.querySession
+                .getCommandSource()
+                .sendMessage(Format.error("Nothing found. See /pr ? for help."));
     }
 
     @Override
     public void error(Exception ex) {
-        this.querySession.getCommandSource().sendMessage(Format.error("An error occurred. Please see the console."));
-        Prism.getInstance().getLogger().error("Exception thrown by {}", getClass().getSimpleName(), ex);
+        this.querySession
+                .getCommandSource()
+                .sendMessage(Format.error("An error occurred. Please see the console."));
+        Prism.getInstance()
+                .getLogger()
+                .error("Exception thrown by {}", getClass().getSimpleName(), ex);
     }
 
     private Text buildResult(Result result) {
@@ -87,36 +97,82 @@ public class LookupCallback extends AsyncCallback {
 
         Text.Builder hoverMessage = Text.builder();
         hoverMessage.append(Format.prefix(), Text.NEW_LINE);
-        hoverMessage.append(Text.of(TextColors.DARK_GRAY, "Source: ", TextColors.WHITE, result.getSourceName(), Text.NEW_LINE));
-        hoverMessage.append(Text.of(TextColors.DARK_GRAY, "PrismEvent: ", TextColors.WHITE, result.getEventName(), Text.NEW_LINE));
+        hoverMessage.append(
+                Text.of(
+                        TextColors.DARK_GRAY,
+                        "Source: ",
+                        TextColors.WHITE,
+                        result.getSourceName(),
+                        Text.NEW_LINE));
+        hoverMessage.append(
+                Text.of(
+                        TextColors.DARK_GRAY,
+                        "PrismEvent: ",
+                        TextColors.WHITE,
+                        result.getEventName(),
+                        Text.NEW_LINE));
 
         String quantity = result.data.getString(DataQueries.Quantity).orElse(null);
         if (StringUtils.isNotBlank(quantity)) {
             resultMessage.append(Text.of(TextColors.DARK_AQUA, quantity, " "));
-            hoverMessage.append(Text.of(TextColors.DARK_GRAY, "Quantity: ", TextColors.WHITE, quantity, Text.NEW_LINE));
+            hoverMessage.append(
+                    Text.of(
+                            TextColors.DARK_GRAY,
+                            "Quantity: ",
+                            TextColors.WHITE,
+                            quantity,
+                            Text.NEW_LINE));
         }
 
         String target = result.data.getString(DataQueries.Target).orElse("Unknown");
         if (StringUtils.isNotBlank(target)) {
             resultMessage.append(Text.of(TextColors.DARK_AQUA, Format.item(target, false), " "));
-            hoverMessage.append(Text.of(TextColors.DARK_GRAY, "Target: ", TextColors.WHITE, target, Text.NEW_LINE));
+            hoverMessage.append(
+                    Text.of(
+                            TextColors.DARK_GRAY,
+                            "Target: ",
+                            TextColors.WHITE,
+                            target,
+                            Text.NEW_LINE));
         }
 
         String id = result.data.getString(DataQueries.Id).orElse(null);
+        for (String field :
+                new String[] {"WEOperation", "WESource", "WEBefore", "WEAfter", "WEStatus"}) {
+            result.data
+                    .getString(org.spongepowered.api.data.DataQuery.of(field))
+                    .ifPresent(
+                            value ->
+                                    hoverMessage.append(
+                                            Text.of(
+                                                    TextColors.DARK_GRAY,
+                                                    field + ": ",
+                                                    TextColors.WHITE,
+                                                    value,
+                                                    Text.NEW_LINE)));
+        }
         if (StringUtils.isNotBlank(id)) {
-            hoverMessage.append(Text.of(TextColors.DARK_GRAY, "Id: ", TextColors.WHITE, id, Text.NEW_LINE));
+            hoverMessage.append(
+                    Text.of(TextColors.DARK_GRAY, "Id: ", TextColors.WHITE, id, Text.NEW_LINE));
         }
 
         String container = result.data.getString(DataQueries.Container).orElse(null);
         if (StringUtils.isNotBlank(container)) {
-            hoverMessage.append(Text.of(TextColors.DARK_GRAY, "Container: ", TextColors.WHITE, container, Text.NEW_LINE));
+            hoverMessage.append(
+                    Text.of(
+                            TextColors.DARK_GRAY,
+                            "Container: ",
+                            TextColors.WHITE,
+                            container,
+                            Text.NEW_LINE));
         }
 
         if (result instanceof ResultAggregate) {
-            int count = result.data.getInt(DataQueries.Count).orElse(0);
+            long count = result.data.getLong(DataQueries.Count).orElse(0L);
             if (count > 0) {
                 resultMessage.append(Text.of(TextColors.GREEN, "x", count, " "));
-                hoverMessage.append(Text.of(TextColors.DARK_GRAY, "Count: ", TextColors.WHITE, count));
+                hoverMessage.append(
+                        Text.of(TextColors.DARK_GRAY, "Count: ", TextColors.WHITE, count));
             }
         }
 
@@ -124,19 +180,45 @@ public class LookupCallback extends AsyncCallback {
             ResultComplete resultComplete = (ResultComplete) result;
 
             resultMessage.append(Text.of(TextColors.WHITE, resultComplete.getRelativeTime()));
-            hoverMessage.append(Text.of(TextColors.DARK_GRAY, "Time: ", TextColors.WHITE, resultComplete.getTime(), Text.NEW_LINE));
+            hoverMessage.append(
+                    Text.of(
+                            TextColors.DARK_GRAY,
+                            "Time: ",
+                            TextColors.WHITE,
+                            resultComplete.getTime(),
+                            Text.NEW_LINE));
 
-            DataView location = (DataView) resultComplete.data.get(DataQueries.Location).orElse(null);
+            DataView location =
+                    (DataView) resultComplete.data.get(DataQueries.Location).orElse(null);
             if (location != null) {
                 int x = location.getInt(DataQueries.X).orElse(0);
                 int y = location.getInt(DataQueries.Y).orElse(0);
                 int z = location.getInt(DataQueries.Z).orElse(0);
-                World world = location.get(DataQueries.WorldUuid).flatMap(TypeUtil::uuidFromObject).flatMap(Sponge.getServer()::getWorld).orElse(null);
+                World world =
+                        location.get(DataQueries.WorldUuid)
+                                .flatMap(TypeUtil::uuidFromObject)
+                                .flatMap(Sponge.getServer()::getWorld)
+                                .orElse(null);
 
-                hoverMessage.append(Text.of(TextColors.DARK_GRAY, "Location: ", TextColors.WHITE, Format.location(x, y, z, world, false)));
+                hoverMessage.append(
+                        Text.of(
+                                TextColors.DARK_GRAY,
+                                "Location: ",
+                                TextColors.WHITE,
+                                Format.location(x, y, z, world, false)));
                 if (this.querySession.hasFlag(Flag.EXTENDED)) {
-                    resultMessage.append(Text.of(Text.NEW_LINE, TextColors.GRAY, " - ", Format.location(x, y, z, world, true)));
-                    hoverMessage.append(Text.of(Text.NEW_LINE, Text.NEW_LINE, TextColors.GRAY, "Click location to teleport."));
+                    resultMessage.append(
+                            Text.of(
+                                    Text.NEW_LINE,
+                                    TextColors.GRAY,
+                                    " - ",
+                                    Format.location(x, y, z, world, true)));
+                    hoverMessage.append(
+                            Text.of(
+                                    Text.NEW_LINE,
+                                    Text.NEW_LINE,
+                                    TextColors.GRAY,
+                                    "Click location to teleport."));
                 }
             }
         }

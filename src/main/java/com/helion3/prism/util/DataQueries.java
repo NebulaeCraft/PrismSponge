@@ -30,8 +30,7 @@ import org.spongepowered.api.data.DataQuery;
 
 public final class DataQueries {
 
-    private DataQueries() {
-    }
+    private DataQueries() {}
 
     public static final DataQuery BlockType = of("BlockType");
     public static final DataQuery BlockState = of("BlockState");
@@ -40,6 +39,8 @@ public final class DataQueries {
     public static final DataQuery ContentVersion = of("ContentVersion");
     public static final DataQuery Count = of("Count");
     public static final DataQuery Created = of("Created");
+    public static final DataQuery Captured = of("Captured");
+    public static final DataQuery Sequence = of("Sequence");
     public static final DataQuery Entity = of("Entity");
     public static final DataQuery EntityType = of("EntityType");
     public static final DataQuery EventName = of("EventName");

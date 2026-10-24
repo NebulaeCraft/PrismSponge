@@ -44,16 +44,24 @@ public class H2SQLQuery extends SQLQuery {
             query.col("COUNT(*) AS total");
             query.group("eventName", "target", "player", "cause");
         } else {
-            query.col("*").leftJoin(tablePrefix + "extra AS e", "r.id = e.record_id");
+            query.col("r.*")
+                    .col("e.json")
+                    .leftJoin(tablePrefix + "extra AS e", "r.id = e.record_id");
         }
 
         query.conditions(session.getQuery().getConditions());
 
         // Sort by timestamp if we're not grouping
         if (session.hasFlag(Flag.NO_GROUP)) {
-            query.order("created " + session.getSortBy().getString());
+            String direction = session.getSortBy().getString();
+            query.order(
+                    "COALESCE(r.Captured,r.Created*1000) " + direction,
+                    "r.CaptureSequence " + direction,
+                    "r.id " + direction);
         }
 
-        return query.limit(session.getQuery().getLimit()).build();
+        return query.limit(session.getQuery().getLimit())
+                .offset(session.getQuery().getOffset())
+                .build();
     }
 }

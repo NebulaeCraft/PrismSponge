@@ -23,6 +23,8 @@
  */
 package com.helion3.prism.api.query;
 
+import com.google.common.collect.Range;
+import com.helion3.prism.Prism;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -30,38 +32,30 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-
 import org.spongepowered.api.data.DataQuery;
 
-import com.google.common.collect.Range;
-import com.helion3.prism.Prism;
-
-/**
- * Super simple SQL query builder.
- */
+/** Super simple SQL query builder. */
 public class SQLQuery {
 
-    protected final static String tablePrefix = Prism.getInstance().getConfig().getStorageCategory().getTablePrefix();
+    protected static final String tablePrefix =
+            Prism.getInstance().getConfig().getStorageCategory().getTablePrefix();
     protected final String query;
 
-    /**
-     * Supported SQL query modes.
-     */
+    /** Supported SQL query modes. */
     public enum Mode {
         SELECT
     }
 
     /**
      * Create a new SQLQuery with a query stirng.
+     *
      * @param query String query
      */
     public SQLQuery(String query) {
         this.query = query;
     }
 
-    /**
-     * Build an SQL query dynamically.
-     */
+    /** Build an SQL query dynamically. */
     public static class Builder {
         private Mode mode;
         private List<String> columns = new ArrayList<>();
@@ -70,6 +64,13 @@ public class SQLQuery {
         private List<String> unhexCols = new ArrayList<>();
         private String table;
         private Integer limit;
+        private int offset;
+
+        public Builder offset(int offset) {
+            this.offset = offset;
+            return this;
+        }
+
         private Map<String, String> joins = new HashMap<>();
         private List<Condition> conditions = new ArrayList<>();
         private Map<DataQuery, QueryValueMutator> valueMutators = new HashMap<>();
@@ -114,8 +115,8 @@ public class SQLQuery {
         }
 
         /**
-         * Group by any number of columns. Will automatically add
-         * the column name to the selected column list.
+         * Group by any number of columns. Will automatically add the column name to the selected
+         * column list.
          *
          * @param cols String... column name(s)
          * @return Builder
@@ -208,13 +209,19 @@ public class SQLQuery {
 
             // Joins
             for (Entry<String, String> entry : joins.entrySet()) {
-                sql.append("LEFT JOIN ").append(entry.getKey()).append(" ON ").append(entry.getValue()).append(" ");
+                sql.append("LEFT JOIN ")
+                        .append(entry.getKey())
+                        .append(" ON ")
+                        .append(entry.getValue())
+                        .append(" ");
             }
 
             // Where
             List<String> queryConditions = buildConditions(conditions);
             if (!queryConditions.isEmpty()) {
-                sql.append("WHERE ").append(String.join(" ", queryConditions).replaceFirst("AND|OR ", "")).append(" ");
+                sql.append("WHERE ")
+                        .append(String.join(" ", queryConditions).replaceFirst("AND|OR ", ""))
+                        .append(" ");
             }
 
             // Group By
@@ -229,6 +236,9 @@ public class SQLQuery {
 
             if (limit != null) {
                 sql.append("LIMIT ").append(limit).append(" ");
+                if (offset > 0) {
+                    sql.append("OFFSET ").append(offset).append(" ");
+                }
             }
 
             return new SQLQuery(sql.toString().trim());
@@ -236,8 +246,8 @@ public class SQLQuery {
 
         /**
          * Recursive method to build AND/OR condition groups.
-         * @todo Needs some more work, tests
          *
+         * @todo Needs some more work, tests
          * @param conditions List<Condition>
          * @return List of String conditions to append to a query.
          */
@@ -253,13 +263,15 @@ public class SQLQuery {
                     for (Object obj : group.getConditions()) {
                         if (obj instanceof ConditionGroup) {
                             query.append(buildConditions(((ConditionGroup) obj).getConditions()));
-                        }
-                        else if (obj instanceof FieldCondition) {
+                        } else if (obj instanceof FieldCondition) {
                             FieldCondition condition = (FieldCondition) obj;
                             String fieldComparator = getFieldComparator(condition);
 
                             if (!fieldComparator.isEmpty()) {
-                                inner.add(popDataQuery(condition.getFieldName().toString()) + " " + fieldComparator);
+                                inner.add(
+                                        popDataQuery(condition.getFieldName().toString())
+                                                + " "
+                                                + fieldComparator);
                             }
                         }
                         // @todo need and/or here
@@ -275,7 +287,12 @@ public class SQLQuery {
                     String fieldComparator = getFieldComparator(condition);
 
                     if (!fieldComparator.isEmpty()) {
-                        queryConditions.add("AND (" + popDataQuery(condition.getFieldName().toString()) + " " + fieldComparator + ")");
+                        queryConditions.add(
+                                "AND ("
+                                        + popDataQuery(condition.getFieldName().toString())
+                                        + " "
+                                        + fieldComparator
+                                        + ")");
                     }
                 }
             }
@@ -308,15 +325,19 @@ public class SQLQuery {
 
             if (condition.getMatchRule().equals(MatchRule.EQUALS)) {
                 fieldComparator += "= " + value + " ";
-            }
-            else if (condition.getMatchRule().equals(MatchRule.BETWEEN)) {
+            } else if (condition.getMatchRule().equals(MatchRule.BETWEEN)) {
                 Range<?> range = (Range<?>) condition.getValue();
-                fieldComparator += "> " + range.lowerEndpoint() + " AND " + field + " < " + range.upperEndpoint() + " ";
-            }
-            else if (condition.getMatchRule().equals(MatchRule.GREATER_THAN_EQUAL)) {
+                fieldComparator +=
+                        "> "
+                                + range.lowerEndpoint()
+                                + " AND "
+                                + field
+                                + " < "
+                                + range.upperEndpoint()
+                                + " ";
+            } else if (condition.getMatchRule().equals(MatchRule.GREATER_THAN_EQUAL)) {
                 fieldComparator += ">= " + value + " ";
-            }
-            else if (condition.getMatchRule().equals(MatchRule.LESS_THAN_EQUAL)) {
+            } else if (condition.getMatchRule().equals(MatchRule.LESS_THAN_EQUAL)) {
                 fieldComparator += "<= " + value + " ";
             }
             // @todo handle includes, excludes

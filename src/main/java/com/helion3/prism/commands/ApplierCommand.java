@@ -32,6 +32,11 @@ import com.helion3.prism.api.records.Actionable;
 import com.helion3.prism.api.records.ActionableResult;
 import com.helion3.prism.api.records.Result;
 import com.helion3.prism.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import org.spongepowered.api.command.CommandResult;
 import org.spongepowered.api.command.CommandSource;
 import org.spongepowered.api.command.args.GenericArguments;
@@ -40,71 +45,90 @@ import org.spongepowered.api.entity.living.player.Player;
 import org.spongepowered.api.scheduler.Task;
 import org.spongepowered.api.text.Text;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-
 public class ApplierCommand {
 
-    private ApplierCommand() {
-    }
+    private ApplierCommand() {}
 
     public static CommandSpec getCommand(Sort sort) {
         return CommandSpec.builder()
-        .permission("prism.rollback")
-        .arguments(GenericArguments.remainingJoinedStrings(Text.of("parameters")))
-        .executor((source, args) -> {
-            // Create a new query session
-            final QuerySession session = new QuerySession(source);
-            session.addFlag(Flag.NO_GROUP);
-            try {
-                source.sendMessage(Format.heading("Querying records..."));
+                .permission("prism.rollback")
+                .arguments(GenericArguments.remainingJoinedStrings(Text.of("parameters")))
+                .executor(
+                        (source, args) -> {
+                            // Create a new query session
+                            final QuerySession session = new QuerySession(source);
+                            session.addFlag(Flag.NO_GROUP);
+                            try {
+                                source.sendMessage(Format.heading("Querying records..."));
 
-                CompletableFuture<Void> future = session.newQueryFromArguments(args.<String>getOne("parameters").get());
-                // Ignore user order flag, if used, for proper rollback/restore order to be used.
-                session.setSortBy(sort);
-                future.thenAccept((v) -> runApplier(session, sort));
-            } catch(Exception e) {
-                source.sendMessage(Format.error(Text.of(e.getMessage())));
-                e.printStackTrace();
-            }
+                                CompletableFuture<Void> future =
+                                        session.newQueryFromArguments(
+                                                args.<String>getOne("parameters").get());
+                                // Ignore user order flag, if used, for proper rollback/restore
+                                // order to be used.
+                                session.setSortBy(sort);
+                                future.thenAccept((v) -> runApplier(session, sort));
+                            } catch (Exception e) {
+                                source.sendMessage(Format.error(Text.of(e.getMessage())));
+                                e.printStackTrace();
+                            }
 
-            return CommandResult.success();
-        })
-        .build();
+                            return CommandResult.success();
+                        })
+                .build();
     }
 
     /**
      * Use a designated QuerySession
+     *
      * @param session
      * @param sort
      */
     public static void runApplier(QuerySession session, Sort sort) {
-        session.getQuery().setLimit(Prism.getInstance().getConfig().getLimitCategory().getMaximumActionable());
-        Task.builder().async().execute(() -> {
-            try {
-                CompletableFuture<List<Result>> futureResults = Prism.getInstance().getStorageAdapter().records().query(session, false);
-                futureResults.whenComplete((results, error) -> finishQuery(session, sort, results, error));
-            } catch (Exception e) {
-                finishQuery(session, sort, null, e);
-            }
-        }).submit(Prism.getInstance().getPluginContainer());
+        session.getQuery()
+                .setLimit(
+                        Prism.getInstance().getConfig().getLimitCategory().getMaximumActionable());
+        Task.builder()
+                .async()
+                .execute(
+                        () -> {
+                            try {
+                                CompletableFuture<List<Result>> futureResults =
+                                        Prism.getInstance()
+                                                .getStorageAdapter()
+                                                .records()
+                                                .query(session, false);
+                                futureResults.whenComplete(
+                                        (results, error) ->
+                                                finishQuery(session, sort, results, error));
+                            } catch (Exception e) {
+                                finishQuery(session, sort, null, e);
+                            }
+                        })
+                .submit(Prism.getInstance().getPluginContainer());
     }
 
-    /**
-     * Return to the server thread before accessing players or changing the world.
-     */
-    private static void finishQuery(QuerySession session, Sort sort, List<Result> results, Throwable error) {
-        Task.builder().execute(() -> {
-            if (error != null) {
-                session.getCommandSource().sendMessage(Format.error("An error occurred. Please see the console."));
-                Prism.getInstance().getLogger().error("Failed to query records for rollback/restore", error);
-                return;
-            }
-            applyResults(session, sort, results);
-        }).submit(Prism.getInstance().getPluginContainer());
+    /** Return to the server thread before accessing players or changing the world. */
+    private static void finishQuery(
+            QuerySession session, Sort sort, List<Result> results, Throwable error) {
+        Task.builder()
+                .execute(
+                        () -> {
+                            if (error != null) {
+                                session.getCommandSource()
+                                        .sendMessage(
+                                                Format.error(
+                                                        "An error occurred. Please see the console."));
+                                Prism.getInstance()
+                                        .getLogger()
+                                        .error(
+                                                "Failed to query records for rollback/restore",
+                                                error);
+                                return;
+                            }
+                            applyResults(session, sort, results);
+                        })
+                .submit(Prism.getInstance().getPluginContainer());
     }
 
     private static void applyResults(QuerySession session, Sort sort, List<Result> results) {
@@ -115,34 +139,51 @@ public class ApplierCommand {
         }
 
         List<ActionableResult> actionResults = new ArrayList<>();
-        for (Result result : results) {
-            try {
-                if (result instanceof Actionable) {
-                    Actionable actionable = (Actionable) result;
-                    if (sort.equals(Sort.NEWEST_FIRST)) {
-                        actionResults.add(actionable.rollback());
-                    } else {
-                        actionResults.add(actionable.restore());
-                    }
-                }
-            } catch (Exception e) {
-                source.sendMessage(Format.error(Text.of(e.getMessage())));
-                e.printStackTrace();
-            }
+        if (session.isTruncated()) {
+            source.sendMessage(
+                    Format.error(
+                            "Results were limited by maximum-actionable; only the matching blocks returned will be changed."));
         }
+        com.helion3.prism.worldedit.TickBatch.apply(
+                results.size(),
+                index -> {
+                    Result result = results.get(index);
+                    try {
+                        if (result instanceof Actionable) {
+                            Actionable actionable = (Actionable) result;
+                            if (sort.equals(Sort.NEWEST_FIRST)) {
+                                actionResults.add(actionable.rollback());
+                            } else {
+                                actionResults.add(actionable.restore());
+                            }
+                        }
+                    } catch (Exception e) {
+                        source.sendMessage(Format.error(Text.of(e.getMessage())));
+                        e.printStackTrace();
+                    }
+                },
+                () -> finishApplication(session, actionResults));
+    }
 
+    private static void finishApplication(
+            QuerySession session, List<ActionableResult> actionResults) {
+        CommandSource source = session.getCommandSource();
         if (source instanceof Player) {
             int changes = 0;
 
             if (session.hasFlag(Flag.CLEAN)) {
-                changes += WorldUtil.removeIllegalBlocks(
-                    ((Player) source).getLocation(), session.getRadius());
-                changes += WorldUtil.removeItemEntitiesAroundLocation(((Player) source).getLocation(), session.getRadius());
+                changes +=
+                        WorldUtil.removeIllegalBlocks(
+                                ((Player) source).getLocation(), session.getRadius());
+                changes +=
+                        WorldUtil.removeItemEntitiesAroundLocation(
+                                ((Player) source).getLocation(), session.getRadius());
             }
 
             if (session.hasFlag(Flag.DRAIN)) {
-                changes += WorldUtil.removeLiquidsAroundLocation(
-                    ((Player) source).getLocation(), session.getRadius());
+                changes +=
+                        WorldUtil.removeLiquidsAroundLocation(
+                                ((Player) source).getLocation(), session.getRadius());
             }
 
             if (changes > 0) {
@@ -164,8 +205,8 @@ public class ApplierCommand {
         }
 
         Map<String, String> tokens = new HashMap<>();
-        tokens.put("appliedCount", ""+appliedCount);
-        tokens.put("skippedCount", ""+skippedCount);
+        tokens.put("appliedCount", "" + appliedCount);
+        tokens.put("skippedCount", "" + skippedCount);
 
         final String messageTemplate;
         if (skippedCount > 0) {
@@ -174,13 +215,16 @@ public class ApplierCommand {
             messageTemplate = Translation.from("rollback.success");
         }
 
-        source.sendMessage(Format.heading(
-            Text.of(Template.parseTemplate(messageTemplate, tokens)),
-            " ", Format.bonus(Translation.from("rollback.success.bonus"))
-        ));
+        source.sendMessage(
+                Format.heading(
+                        Text.of(Template.parseTemplate(messageTemplate, tokens)),
+                        " ",
+                        Format.bonus(Translation.from("rollback.success.bonus"))));
 
         if (source instanceof Player) {
-            Prism.getInstance().getLastActionResults().put(((Player) source).getUniqueId(), actionResults);
+            Prism.getInstance()
+                    .getLastActionResults()
+                    .put(((Player) source).getUniqueId(), actionResults);
         }
     }
 }

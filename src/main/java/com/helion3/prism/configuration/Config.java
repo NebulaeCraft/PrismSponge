@@ -35,6 +35,14 @@ import ninja.leaping.configurate.objectmapping.serialize.ConfigSerializable;
 @ConfigSerializable
 public class Config {
 
+    @Setting(value = "worldedit")
+    private com.helion3.prism.configuration.category.WorldEditCategory worldEditCategory =
+            new com.helion3.prism.configuration.category.WorldEditCategory();
+
+    public com.helion3.prism.configuration.category.WorldEditCategory getWorldEditCategory() {
+        return worldEditCategory;
+    }
+
     @Setting(value = "default")
     private DefaultCategory defaultCategory = new DefaultCategory();
 

@@ -26,10 +26,9 @@ package com.helion3.prism.util;
 import com.helion3.prism.Prism;
 import com.helion3.prism.api.query.QuerySession;
 import com.helion3.prism.api.records.Result;
-import org.spongepowered.api.Sponge;
-
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import org.spongepowered.api.Sponge;
 
 public class AsyncUtil {
     private AsyncUtil() {}
@@ -41,7 +40,8 @@ public class AsyncUtil {
      */
     public static void lookup(final QuerySession session) {
         // Enforce lookup limits
-        session.getQuery().setLimit(Prism.getInstance().getConfig().getLimitCategory().getMaximumLookup());
+        session.getQuery()
+                .setLimit(Prism.getInstance().getConfig().getLimitCategory().getMaximumLookup());
         async(session, new LookupCallback(session));
     }
 
@@ -52,25 +52,55 @@ public class AsyncUtil {
      * @param callback AsyncCallback describing the success, empty, and error callbacks.
      */
     private static void async(final QuerySession session, AsyncCallback callback) {
-        Sponge.getScheduler().createTaskBuilder().async().execute(() -> {
-            try {
-                CompletableFuture<List<Result>> future = Prism.getInstance().getStorageAdapter().records().query(session, true);
-                future.thenAccept(results -> {
-                    try {
-                        if (results.isEmpty()) {
-                            callback.empty();
-                        } else {
-                            callback.success(results);
-                        }
-                    } catch(Exception e) {
-                        session.getCommandSource().sendMessage(Format.error(e.getMessage()));
-                        e.printStackTrace();
-                    }
-                });
-            } catch (Exception e) {
-                callback.error(e);
-                e.printStackTrace();
-            }
-        }).submit(Prism.getInstance().getPluginContainer());
+        Sponge.getScheduler()
+                .createTaskBuilder()
+                .async()
+                .execute(
+                        () -> {
+                            try {
+                                CompletableFuture<List<Result>> future =
+                                        Prism.getInstance()
+                                                .getStorageAdapter()
+                                                .records()
+                                                .query(session, true);
+                                future.whenComplete(
+                                        (results, failure) ->
+                                                Sponge.getScheduler()
+                                                        .createTaskBuilder()
+                                                        .execute(
+                                                                () -> {
+                                                                    try {
+                                                                        if (failure != null) {
+                                                                            callback.error(
+                                                                                    new Exception(
+                                                                                            "Lookup failed",
+                                                                                            failure));
+                                                                            return;
+                                                                        }
+                                                                        if (results.isEmpty()) {
+                                                                            callback.empty();
+                                                                        } else {
+                                                                            callback.success(
+                                                                                    results);
+                                                                        }
+                                                                    } catch (Exception e) {
+                                                                        session.getCommandSource()
+                                                                                .sendMessage(
+                                                                                        Format
+                                                                                                .error(
+                                                                                                        e
+                                                                                                                .getMessage()));
+                                                                        e.printStackTrace();
+                                                                    }
+                                                                })
+                                                        .submit(
+                                                                Prism.getInstance()
+                                                                        .getPluginContainer()));
+                            } catch (Exception e) {
+                                callback.error(e);
+                                e.printStackTrace();
+                            }
+                        })
+                .submit(Prism.getInstance().getPluginContainer());
     }
 }

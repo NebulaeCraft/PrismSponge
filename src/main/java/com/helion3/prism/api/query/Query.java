@@ -29,6 +29,18 @@ import java.util.List;
 public final class Query {
     private final List<Condition> conditions = new ArrayList<>();
     private int limit = 1000;
+    private int offset;
+
+    public int getOffset() {
+        return offset;
+    }
+
+    public void setOffset(int offset) {
+        if (offset < 0) {
+            throw new IllegalArgumentException("Query offset cannot be negative");
+        }
+        this.offset = offset;
+    }
 
     public void addConditions(List<Condition> conditions) {
         this.conditions.addAll(conditions);
@@ -43,10 +55,7 @@ public final class Query {
         conditions.add(condition);
     }
 
-    /**
-     *
-     * @return
-     */
+    /** @return */
     public List<Condition> getConditions() {
         return conditions;
     }

@@ -48,13 +48,28 @@ public class ChangeBlockListener {
     @Listener(order = Order.POST)
     public void onChangeBlock(ChangeBlockEvent event) {
 
-        if (event.getCause().allOf(PluginContainer.class).stream().map(PluginContainer::getId).anyMatch(id ->
-                Prism.getInstance().getConfig().getGeneralCategory().getBlacklist().contains(id))) {
+        if (com.helion3.prism.worldedit.CaptureGuard.active()) {
+            return;
+        }
+
+        if (event.getCause().allOf(PluginContainer.class).stream()
+                .map(PluginContainer::getId)
+                .anyMatch(
+                        id ->
+                                Prism.getInstance()
+                                        .getConfig()
+                                        .getGeneralCategory()
+                                        .getBlacklist()
+                                        .contains(id))) {
             // Don't do anything
             return;
         }
 
-        if (event.getCause().first(Player.class).map(Player::getUniqueId).map(Prism.getInstance().getActiveWands()::contains).orElse(false)) {
+        if (event.getCause()
+                .first(Player.class)
+                .map(Player::getUniqueId)
+                .map(Prism.getInstance().getActiveWands()::contains)
+                .orElse(false)) {
             // Cancel and exit event here, not supposed to place/track a block with an active wand.
             event.setCancelled(true);
             return;
@@ -62,9 +77,9 @@ public class ChangeBlockListener {
 
         if (event.getTransactions().isEmpty()
                 || (!Prism.getInstance().getConfig().getEventCategory().isBlockBreak()
-                && !Prism.getInstance().getConfig().getEventCategory().isBlockDecay()
-                && !Prism.getInstance().getConfig().getEventCategory().isBlockGrow()
-                && !Prism.getInstance().getConfig().getEventCategory().isBlockPlace())) {
+                        && !Prism.getInstance().getConfig().getEventCategory().isBlockDecay()
+                        && !Prism.getInstance().getConfig().getEventCategory().isBlockGrow()
+                        && !Prism.getInstance().getConfig().getEventCategory().isBlockPlace())) {
             return;
         }
 
@@ -73,19 +88,31 @@ public class ChangeBlockListener {
                 continue;
             }
 
+            org.spongepowered.api.world.Location<org.spongepowered.api.world.World> changed =
+                    transaction.getOriginal().getLocation().get();
+            if (com.helion3.prism.worldedit.CaptureGuard.owns(
+                    changed.getExtent().getUniqueId().toString(),
+                    changed.getBlockX(),
+                    changed.getBlockY(),
+                    changed.getBlockZ())) {
+                continue;
+            }
+
             BlockType originalBlockType = transaction.getOriginal().getState().getType();
             BlockType finalBlockType = transaction.getFinal().getState().getType();
 
-            PrismRecord.EventBuilder eventBuilder = PrismRecord.create()
-                    .source(event.getCause())
-                    .blockOriginal(transaction.getOriginal())
-                    .blockReplacement(transaction.getFinal())
-                    .location(transaction.getOriginal().getLocation().get());
+            PrismRecord.EventBuilder eventBuilder =
+                    PrismRecord.create()
+                            .source(event.getCause())
+                            .blockOriginal(transaction.getOriginal())
+                            .blockReplacement(transaction.getFinal())
+                            .location(transaction.getOriginal().getLocation().get());
 
             if (event instanceof ChangeBlockEvent.Break) {
                 if (!Prism.getInstance().getConfig().getEventCategory().isBlockBreak()
                         || BlockUtil.rejectBreakCombination(originalBlockType, finalBlockType)
-                        || EventUtil.rejectBreakEventIdentity(originalBlockType, finalBlockType, event.getCause())) {
+                        || EventUtil.rejectBreakEventIdentity(
+                                originalBlockType, finalBlockType, event.getCause())) {
                     continue;
                 }
 
@@ -114,7 +141,8 @@ public class ChangeBlockListener {
             } else if (event instanceof ChangeBlockEvent.Place) {
                 if (!Prism.getInstance().getConfig().getEventCategory().isBlockPlace()
                         || BlockUtil.rejectPlaceCombination(originalBlockType, finalBlockType)
-                        || EventUtil.rejectPlaceEventIdentity(originalBlockType, finalBlockType, event.getCause())) {
+                        || EventUtil.rejectPlaceEventIdentity(
+                                originalBlockType, finalBlockType, event.getCause())) {
                     continue;
                 }
 

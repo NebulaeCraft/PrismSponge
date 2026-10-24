@@ -24,13 +24,19 @@
 
 package com.helion3.prism.util;
 
-import java.util.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.Map.Entry;
-
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonPrimitive;
+import com.helion3.prism.Prism;
 import com.helion3.prism.api.records.Result;
+import java.util.*;
+import java.util.Map.Entry;
+import java.util.concurrent.CompletableFuture;
 import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.math.NumberUtils;
@@ -40,30 +46,21 @@ import org.spongepowered.api.Sponge;
 import org.spongepowered.api.data.DataContainer;
 import org.spongepowered.api.data.DataQuery;
 import org.spongepowered.api.data.DataView;
-
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonPrimitive;
-import com.helion3.prism.Prism;
 import org.spongepowered.api.profile.GameProfile;
 
 public class DataUtil {
 
-    private static final CharSequenceTranslator CHAR_SEQUENCE_TRANSLATOR = StringEscapeUtils.ESCAPE_JAVA.with(
-            UnicodeEscaper.between(0, 47),
-            // 0 - 9
-            UnicodeEscaper.between(58, 64),
-            // A - Z
-            UnicodeEscaper.between(91, 96),
-            // a - z
-            UnicodeEscaper.between(123, Integer.MAX_VALUE)
-    );
+    private static final CharSequenceTranslator CHAR_SEQUENCE_TRANSLATOR =
+            StringEscapeUtils.ESCAPE_JAVA.with(
+                    UnicodeEscaper.between(0, 47),
+                    // 0 - 9
+                    UnicodeEscaper.between(58, 64),
+                    // A - Z
+                    UnicodeEscaper.between(91, 96),
+                    // a - z
+                    UnicodeEscaper.between(123, Integer.MAX_VALUE));
 
-    private DataUtil() {
-    }
+    private DataUtil() {}
 
     /**
      * Checks an object against known primitive object types.
@@ -84,10 +81,10 @@ public class DataUtil {
     }
 
     /**
-     * Encodes all non-alphanumeric characters in the provided DataQuery,
-     * the encodes parts are then joined with a non-encoded symbol.
+     * Encodes all non-alphanumeric characters in the provided DataQuery, the encodes parts are then
+     * joined with a non-encoded symbol.
      *
-     * Fixes https://github.com/prism/Prism/issues/90
+     * <p>Fixes https://github.com/prism/Prism/issues/90
      *
      * @param dataQuery Unescaped DataQuery
      * @return Escaped string
@@ -113,11 +110,11 @@ public class DataUtil {
     }
 
     /**
-     * Decodes all encoded characters in the provided String,
-     * the string is split by a non-encoded symbol and each part is then decoded
-     * and finally a DataQuery is created using the decoded parts.
+     * Decodes all encoded characters in the provided String, the string is split by a non-encoded
+     * symbol and each part is then decoded and finally a DataQuery is created using the decoded
+     * parts.
      *
-     * Fixes https://github.com/prism/Prism/issues/90
+     * <p>Fixes https://github.com/prism/Prism/issues/90
      *
      * @param string Escaped string
      * @return Unescaped DataQuery
@@ -143,6 +140,7 @@ public class DataUtil {
 
     /**
      * Build a DataView from provided JSON.
+     *
      * @param json JsonObject
      * @return DataView
      */
@@ -153,7 +151,9 @@ public class DataUtil {
             if (value.isPresent()) {
                 data.set(unescapeQuery(entry.getKey()), value.get());
             } else {
-                Prism.getInstance().getLogger().error(String.format("Failed to transform %s data.", entry.getKey()));
+                Prism.getInstance()
+                        .getLogger()
+                        .error(String.format("Failed to transform %s data.", entry.getKey()));
             }
         }
 
@@ -241,7 +241,13 @@ public class DataUtil {
                     } else if (object.getClass().isEnum()) {
                         // convertedList.add(object.toString());
                     } else {
-                        Prism.getInstance().getLogger().error("Unsupported json list data type: " + object.getClass().getName() + " for key " + key);
+                        Prism.getInstance()
+                                .getLogger()
+                                .error(
+                                        "Unsupported json list data type: "
+                                                + object.getClass().getName()
+                                                + " for key "
+                                                + key);
                     }
 
                     if (!convertedList.isEmpty()) {
@@ -261,7 +267,8 @@ public class DataUtil {
             } else if (value.getClass().isArray()) {
                 jsonObject.add(key, gson.toJsonTree(new PrimitiveArray(value)));
             } else {
-                // Prism.getInstance().getLogger().error("Unsupported json data type: " + value.getClass().getName() + " for key " + key);
+                // Prism.getInstance().getLogger().error("Unsupported json data type: " +
+                // value.getClass().getName() + " for key " + key);
             }
         }
 
@@ -275,22 +282,31 @@ public class DataUtil {
      * @param uuidsPendingLookup Lists of UUIDs pending lookup
      * @return CompletableFuture
      */
-    public static CompletableFuture<List<Result>> translateUuidsToNames(List<Result> results, List<UUID> uuidsPendingLookup) {
+    public static CompletableFuture<List<Result>> translateUuidsToNames(
+            List<Result> results, List<UUID> uuidsPendingLookup) {
         CompletableFuture<List<Result>> future = new CompletableFuture<>();
 
-        CompletableFuture<Collection<GameProfile>> futures = Sponge.getServer().getGameProfileManager().getAllById(uuidsPendingLookup, true);
-        futures.thenAccept((profiles) -> {
-            for (GameProfile profile : profiles) {
-                for (Result r : results) {
-                    Optional<Object> cause = r.data.get(DataQueries.Cause);
-                    if (cause.isPresent() && cause.get().equals(profile.getUniqueId().toString())) {
-                        r.data.set(DataQueries.Cause, profile.getName().orElse("unknown"));
+        CompletableFuture<Collection<GameProfile>> futures =
+                Sponge.getServer().getGameProfileManager().getAllById(uuidsPendingLookup, true);
+        futures.thenAccept(
+                (profiles) -> {
+                    for (GameProfile profile : profiles) {
+                        for (Result r : results) {
+                            Optional<Object> cause = r.data.get(DataQueries.Cause);
+                            if (cause.isPresent()
+                                    && cause.get().equals(profile.getUniqueId().toString())) {
+                                r.data.set(DataQueries.Cause, profile.getName().orElse("unknown"));
+                            }
+                        }
                     }
-                }
-            }
 
-            future.complete(results);
-        });
+                    future.complete(results);
+                });
+        futures.exceptionally(
+                error -> {
+                    future.completeExceptionally(error);
+                    return null;
+                });
 
         return future;
     }
@@ -303,7 +319,8 @@ public class DataUtil {
      * @param value Object
      * @throws IllegalArgumentException If an attempt is made to change an existing value.
      */
-    public static void writeToDataView(DataView dataView, DataQuery path, Object value) throws IllegalArgumentException {
+    public static void writeToDataView(DataView dataView, DataQuery path, Object value)
+            throws IllegalArgumentException {
         Preconditions.checkNotNull(dataView);
         Preconditions.checkNotNull(path);
 
@@ -313,7 +330,12 @@ public class DataUtil {
                 throw new IllegalArgumentException("Attempted to overwrite " + path.toString());
             }
 
-            Prism.getInstance().getLogger().warn("Attempted to overwrite {} with the same value", path.toString(), new Exception());
+            Prism.getInstance()
+                    .getLogger()
+                    .warn(
+                            "Attempted to overwrite {} with the same value",
+                            path.toString(),
+                            new Exception());
             return;
         }
 

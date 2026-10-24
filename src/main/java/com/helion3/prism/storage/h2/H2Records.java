@@ -23,6 +23,19 @@
  */
 package com.helion3.prism.storage.h2;
 
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import com.helion3.prism.Prism;
+import com.helion3.prism.api.flags.Flag;
+import com.helion3.prism.api.query.Query;
+import com.helion3.prism.api.query.QuerySession;
+import com.helion3.prism.api.query.SQLQuery;
+import com.helion3.prism.api.records.Result;
+import com.helion3.prism.api.storage.StorageAdapterRecords;
+import com.helion3.prism.api.storage.StorageDeleteResult;
+import com.helion3.prism.api.storage.StorageWriteResult;
+import com.helion3.prism.util.DataQueries;
+import com.helion3.prism.util.DataUtil;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -32,40 +45,37 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-
-import com.helion3.prism.api.flags.Flag;
-import com.helion3.prism.api.records.Result;
 import org.spongepowered.api.data.DataContainer;
 import org.spongepowered.api.data.DataQuery;
 import org.spongepowered.api.data.DataView;
 
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
-import com.helion3.prism.Prism;
-import com.helion3.prism.api.query.Query;
-import com.helion3.prism.api.query.QuerySession;
-import com.helion3.prism.api.query.SQLQuery;
-import com.helion3.prism.api.storage.StorageAdapterRecords;
-import com.helion3.prism.api.storage.StorageDeleteResult;
-import com.helion3.prism.api.storage.StorageWriteResult;
-import com.helion3.prism.util.DataQueries;
-import com.helion3.prism.util.DataUtil;
-
 public class H2Records implements StorageAdapterRecords {
 
-    private final String tablePrefix = Prism.getInstance().getConfig().getStorageCategory().getTablePrefix();
+    private final String tablePrefix =
+            Prism.getInstance().getConfig().getStorageCategory().getTablePrefix();
 
     @Override
     public StorageWriteResult write(List<DataContainer> containers) throws Exception {
-        String sql = String.format("INSERT INTO %srecords(%s, %s, %s, %s, %s, %s, %s, %s, %s)" +
-                        " values(?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                tablePrefix,
-                DataQueries.Created, DataQueries.EventName, DataQueries.WorldUuid,
-                DataQueries.X, DataQueries.Y, DataQueries.Z,
-                DataQueries.Target, DataQueries.Player, DataQueries.Cause
-        );
+        String sql =
+                String.format(
+                        "INSERT INTO %srecords(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+                                + " values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        tablePrefix,
+                        DataQueries.Created,
+                        DataQueries.EventName,
+                        DataQueries.WorldUuid,
+                        DataQueries.X,
+                        DataQueries.Y,
+                        DataQueries.Z,
+                        DataQueries.Target,
+                        DataQueries.Player,
+                        DataQueries.Cause,
+                        DataQueries.Captured,
+                        "CaptureSequence");
 
-        try (Connection conn = H2StorageAdapter.getConnection(); PreparedStatement statement = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+        try (Connection conn = H2StorageAdapter.getConnection();
+                PreparedStatement statement =
+                        conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
             for (DataContainer container : containers) {
                 DataView location = container.getView(DataQueries.Location).get();
@@ -76,7 +86,11 @@ public class H2Records implements StorageAdapterRecords {
                     playerUUID = player.get();
                 }
 
-                statement.setLong( 1, System.currentTimeMillis() / 1000L );
+                long captured =
+                        container.getLong(DataQueries.Captured).orElse(System.currentTimeMillis());
+                statement.setLong(1, captured / 1000L);
+                statement.setLong(10, captured);
+                statement.setLong(11, container.getLong(DataQueries.Sequence).orElse(0L));
                 statement.setObject(2, container.getString(DataQueries.EventName).get());
                 statement.setObject(3, location.getString(DataQueries.WorldUuid).get());
                 statement.setInt(4, location.getInt(DataQueries.X).get());
@@ -88,6 +102,7 @@ public class H2Records implements StorageAdapterRecords {
 
                 // Remove some data not needed for extra storage
                 container.remove(DataQueries.Location);
+                container.remove(DataQueries.Created);
                 container.remove(DataQueries.EventName);
                 container.remove(DataQueries.Player);
                 container.remove(DataQueries.Cause);
@@ -116,7 +131,8 @@ public class H2Records implements StorageAdapterRecords {
     protected StorageWriteResult writeExtraData(int recordId, String json) throws Exception {
         String sql = "INSERT INTO " + tablePrefix + "extra(record_id, json) values(?, ?)";
 
-        try (Connection conn = H2StorageAdapter.getConnection(); PreparedStatement statement = conn.prepareStatement(sql)) {
+        try (Connection conn = H2StorageAdapter.getConnection();
+                PreparedStatement statement = conn.prepareStatement(sql)) {
             statement.setInt(1, recordId);
             statement.setString(2, json);
             statement.executeUpdate();
@@ -126,7 +142,8 @@ public class H2Records implements StorageAdapterRecords {
     }
 
     @Override
-    public CompletableFuture<List<Result>> query(QuerySession session, boolean translate) throws Exception {
+    public CompletableFuture<List<Result>> query(QuerySession session, boolean translate)
+            throws Exception {
         // Prepare results
         List<Result> results = new ArrayList<>();
         CompletableFuture<List<Result>> future = new CompletableFuture<>();
@@ -134,11 +151,16 @@ public class H2Records implements StorageAdapterRecords {
         SQLQuery query = H2SQLQuery.from(session);
         Prism.getInstance().getLogger().debug("H2 SQL Query: " + query);
 
-        try (Connection conn = H2StorageAdapter.getConnection(); PreparedStatement statement = conn.prepareStatement(query.toString()); ResultSet rs = statement.executeQuery()) {
+        try (Connection conn = H2StorageAdapter.getConnection();
+                PreparedStatement statement = conn.prepareStatement(query.toString());
+                ResultSet rs = statement.executeQuery()) {
             List<UUID> uuidsPendingLookup = new ArrayList<>();
 
             while (rs.next()) {
-                Result result = Result.from(rs.getString(DataQueries.EventName.toString()), !session.hasFlag(Flag.NO_GROUP));
+                Result result =
+                        Result.from(
+                                rs.getString(DataQueries.EventName.toString()),
+                                !session.hasFlag(Flag.NO_GROUP));
 
                 // Restore the data container
                 DataContainer data = DataContainer.createNew();
@@ -157,17 +179,30 @@ public class H2Records implements StorageAdapterRecords {
                     data.set(DataQueries.Location, loc);
 
                     data.set(DataQueries.Created, rs.getLong(DataQueries.Created.toString()));
+                    data.set(
+                            org.spongepowered.api.data.DataQuery.of("StorageId"), rs.getLong("id"));
+                    long captured = rs.getLong("Captured");
+                    data.set(
+                            DataQueries.Captured,
+                            captured == 0 ? rs.getLong("Created") * 1000 : captured);
+                    data.set(DataQueries.Sequence, rs.getLong("CaptureSequence"));
 
                     if (rs.getString("json") != null) {
                         try {
-                            JsonObject json = new JsonParser().parse(rs.getString("json")).getAsJsonObject();
+                            JsonObject json =
+                                    new JsonParser().parse(rs.getString("json")).getAsJsonObject();
                             DataView extra = DataUtil.dataViewFromJson(json);
 
                             for (DataQuery key : extra.getKeys(false)) {
                                 data.set(key, extra.get(key).get());
                             }
                         } catch (Exception ex) {
-                            Prism.getInstance().getLogger().error("Failed to deserialize {} at {}", target, loc.toString());
+                            Prism.getInstance()
+                                    .getLogger()
+                                    .error(
+                                            "Failed to deserialize {} at {}",
+                                            target,
+                                            loc.toString());
                             throw ex;
                         }
                     }
@@ -176,6 +211,7 @@ public class H2Records implements StorageAdapterRecords {
                 // Determine the final name of the event source
                 String player = rs.getString(DataQueries.Player.toString());
                 if (player != null && !player.isEmpty()) {
+                    data.set(DataQueries.Player, player);
                     data.set(DataQueries.Cause, player);
 
                     if (translate) {
@@ -190,7 +226,8 @@ public class H2Records implements StorageAdapterRecords {
             }
 
             if (translate && !uuidsPendingLookup.isEmpty()) {
-                DataUtil.translateUuidsToNames(results, uuidsPendingLookup).thenAccept(future::complete);
+                DataUtil.translateUuidsToNames(results, uuidsPendingLookup)
+                        .thenAccept(future::complete);
             } else {
                 future.complete(results);
             }

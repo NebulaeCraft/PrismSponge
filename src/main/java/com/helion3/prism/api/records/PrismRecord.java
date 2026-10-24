@@ -30,6 +30,8 @@ import com.helion3.prism.api.data.PrismEvent;
 import com.helion3.prism.queues.RecordingQueue;
 import com.helion3.prism.util.DataQueries;
 import com.helion3.prism.util.DataUtil;
+import java.util.Date;
+import java.util.Optional;
 import org.spongepowered.api.Sponge;
 import org.spongepowered.api.block.BlockSnapshot;
 import org.spongepowered.api.block.BlockType;
@@ -50,12 +52,9 @@ import org.spongepowered.api.text.Text;
 import org.spongepowered.api.world.Location;
 import org.spongepowered.api.world.World;
 
-import java.util.Date;
-import java.util.Optional;
-
 /**
- * An easy-to-understand factory class for Prism records,
- * By chaining methods together, you can build a record.
+ * An easy-to-understand factory class for Prism records, By chaining methods together, you can
+ * build a record.
  *
  * <pre><b>Example:</b>{@code
  * PrismRecord.create()
@@ -74,8 +73,8 @@ public class PrismRecord {
     /**
      * A final, save-ready record.
      *
-     * @param event         Event Id
-     * @param source        Source
+     * @param event Event Id
+     * @param source Source
      * @param dataContainer DataContainer
      */
     private PrismRecord(String event, Object source, DataContainer dataContainer) {
@@ -84,10 +83,11 @@ public class PrismRecord {
         this.dataContainer = dataContainer;
     }
 
-    /**
-     * Save the current record.
-     */
+    /** Save the current record. */
     public void save() {
+        long sequence = com.helion3.prism.worldedit.CaptureOrder.next();
+        getDataContainer().set(DataQueries.Captured, sequence / 1000);
+        getDataContainer().set(DataQueries.Sequence, sequence);
         DataUtil.writeToDataView(getDataContainer(), DataQueries.Created, new Date());
         DataUtil.writeToDataView(getDataContainer(), DataQueries.EventName, getEvent());
 
@@ -108,13 +108,23 @@ public class PrismRecord {
         }
 
         // Original block filtered?
-        Optional<BlockType> originalBlockType = getDataContainer().getObject(DataQueries.OriginalBlock.then(DataQueries.BlockState).then(DataQueries.BlockType), BlockType.class);
+        Optional<BlockType> originalBlockType =
+                getDataContainer()
+                        .getObject(
+                                DataQueries.OriginalBlock.then(DataQueries.BlockState)
+                                        .then(DataQueries.BlockType),
+                                BlockType.class);
         if (originalBlockType.map(Prism.getInstance().getFilterList()::allows).orElse(false)) {
             return;
         }
 
         // Replacement block filtered?
-        Optional<BlockType> replacementBlockType = getDataContainer().getObject(DataQueries.ReplacementBlock.then(DataQueries.BlockState).then(DataQueries.BlockType), BlockType.class);
+        Optional<BlockType> replacementBlockType =
+                getDataContainer()
+                        .getObject(
+                                DataQueries.ReplacementBlock.then(DataQueries.BlockState)
+                                        .then(DataQueries.BlockType),
+                                BlockType.class);
         if (replacementBlockType.map(Prism.getInstance().getFilterList()::allows).orElse(false)) {
             return;
         }
@@ -144,9 +154,7 @@ public class PrismRecord {
         return dataContainer;
     }
 
-    /**
-     * Build record event/action details.
-     */
+    /** Build record event/action details. */
     public static class EventBuilder {
 
         private final Object source;
@@ -167,7 +175,8 @@ public class PrismRecord {
         public EventBuilder blockOriginal(BlockSnapshot block) {
             Preconditions.checkNotNull(block);
 
-            DataUtil.writeToDataView(getDataContainer(), DataQueries.OriginalBlock, formatBlockDataContainer(block));
+            DataUtil.writeToDataView(
+                    getDataContainer(), DataQueries.OriginalBlock, formatBlockDataContainer(block));
             return this;
         }
 
@@ -179,7 +188,10 @@ public class PrismRecord {
         public EventBuilder blockReplacement(BlockSnapshot block) {
             Preconditions.checkNotNull(block);
 
-            DataUtil.writeToDataView(getDataContainer(), DataQueries.ReplacementBlock, formatBlockDataContainer(block));
+            DataUtil.writeToDataView(
+                    getDataContainer(),
+                    DataQueries.ReplacementBlock,
+                    formatBlockDataContainer(block));
             return this;
         }
 
@@ -207,7 +219,8 @@ public class PrismRecord {
 
             Optional<DataView> position = entityData.getView(DataQueries.Position);
             if (position.isPresent()) {
-                position.get().set(DataQueries.WorldUuid, entityData.get(DataQueries.WorldUuid).get());
+                position.get()
+                        .set(DataQueries.WorldUuid, entityData.get(DataQueries.WorldUuid).get());
                 DataUtil.writeToDataView(getDataContainer(), DataQueries.Location, position.get());
 
                 entityData.remove(DataQueries.Position);
@@ -224,7 +237,12 @@ public class PrismRecord {
 
             DataUtil.writeToDataView(getDataContainer(), DataQueries.Entity, entityData);
             DataUtil.writeToDataView(getDataContainer(), DataQueries.Id, entity.getType().getId());
-            DataUtil.writeToDataView(getDataContainer(), DataQueries.Target, entity.get(Keys.DISPLAY_NAME).map(Text::toPlain).orElse(entity.getType().getName()));
+            DataUtil.writeToDataView(
+                    getDataContainer(),
+                    DataQueries.Target,
+                    entity.get(Keys.DISPLAY_NAME)
+                            .map(Text::toPlain)
+                            .orElse(entity.getType().getName()));
             return this;
         }
 
@@ -256,13 +274,14 @@ public class PrismRecord {
          * Helper method for writing ItemStack container data.
          *
          * @param itemStack The ItemStack to write
-         * @param quantity  The quantity to write
+         * @param quantity The quantity to write
          */
         public EventBuilder itemStack(ItemStack itemStack, int quantity) {
             Preconditions.checkNotNull(itemStack);
             Preconditions.checkArgument(itemStack.getType() != ItemTypes.NONE);
 
-            DataUtil.writeToDataView(getDataContainer(), DataQueries.Target, itemStack.getType().getId());
+            DataUtil.writeToDataView(
+                    getDataContainer(), DataQueries.Target, itemStack.getType().getId());
             DataUtil.writeToDataView(getDataContainer(), DataQueries.Quantity, quantity);
             return this;
         }
@@ -281,13 +300,14 @@ public class PrismRecord {
          * Helper method for writing ItemStackSnapshot container data.
          *
          * @param itemStack The ItemStackSnapshot to write
-         * @param quantity  The quantity to write
+         * @param quantity The quantity to write
          */
         public EventBuilder itemStack(ItemStackSnapshot itemStack, int quantity) {
             Preconditions.checkNotNull(itemStack);
             Preconditions.checkArgument(itemStack.getType() != ItemTypes.NONE);
 
-            DataUtil.writeToDataView(getDataContainer(), DataQueries.Target, itemStack.getType().getId());
+            DataUtil.writeToDataView(
+                    getDataContainer(), DataQueries.Target, itemStack.getType().getId());
             DataUtil.writeToDataView(getDataContainer(), DataQueries.Quantity, quantity);
             return this;
         }
@@ -334,7 +354,8 @@ public class PrismRecord {
             blockData.remove(DataQueries.Position);
             blockData.remove(DataQueries.WorldUuid);
 
-            DataView unsafeData = blockData.getObject(DataQueries.UnsafeData, DataView.class).orElse(null);
+            DataView unsafeData =
+                    blockData.getObject(DataQueries.UnsafeData, DataView.class).orElse(null);
             if (unsafeData != null) {
                 unsafeData.remove(DataQueries.X);
                 unsafeData.remove(DataQueries.Y);
@@ -351,13 +372,13 @@ public class PrismRecord {
          * @return A new prism record
          */
         public PrismRecord build() {
-            Preconditions.checkState(Sponge.getRegistry().getType(PrismEvent.class, getEvent()).isPresent(), getEvent() + " is not registered");
+            Preconditions.checkState(
+                    Sponge.getRegistry().getType(PrismEvent.class, getEvent()).isPresent(),
+                    getEvent() + " is not registered");
             return new PrismRecord(getEvent(), getSource(), getDataContainer());
         }
 
-        /**
-         * Creates a new {@link PrismRecord} and immediately saves it.
-         */
+        /** Creates a new {@link PrismRecord} and immediately saves it. */
         public void buildAndSave() {
             build().save();
         }
@@ -389,9 +410,7 @@ public class PrismRecord {
         }
     }
 
-    /**
-     * Build record with event source.
-     */
+    /** Build record with event source. */
     public static class SourceBuilder {
 
         /**
@@ -411,7 +430,8 @@ public class PrismRecord {
                 return new PrismRecord.EventBuilder(attacker);
             }
 
-            IndirectEntityDamageSource indirectAttacker = cause.first(IndirectEntityDamageSource.class).orElse(null);
+            IndirectEntityDamageSource indirectAttacker =
+                    cause.first(IndirectEntityDamageSource.class).orElse(null);
             if (indirectAttacker != null) {
                 return new PrismRecord.EventBuilder(indirectAttacker);
             }

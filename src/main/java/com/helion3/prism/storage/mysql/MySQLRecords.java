@@ -23,6 +23,20 @@
  */
 package com.helion3.prism.storage.mysql;
 
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import com.helion3.prism.Prism;
+import com.helion3.prism.api.flags.Flag;
+import com.helion3.prism.api.query.Query;
+import com.helion3.prism.api.query.QuerySession;
+import com.helion3.prism.api.query.SQLQuery;
+import com.helion3.prism.api.records.Result;
+import com.helion3.prism.api.storage.StorageAdapterRecords;
+import com.helion3.prism.api.storage.StorageDeleteResult;
+import com.helion3.prism.api.storage.StorageWriteResult;
+import com.helion3.prism.util.DataQueries;
+import com.helion3.prism.util.DataUtil;
+import com.helion3.prism.util.TypeUtil;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -35,29 +49,14 @@ import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-
-import com.helion3.prism.api.flags.Flag;
-import com.helion3.prism.api.records.Result;
 import org.spongepowered.api.data.DataContainer;
 import org.spongepowered.api.data.DataQuery;
 import org.spongepowered.api.data.DataView;
 
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
-import com.helion3.prism.Prism;
-import com.helion3.prism.api.query.Query;
-import com.helion3.prism.api.query.QuerySession;
-import com.helion3.prism.api.query.SQLQuery;
-import com.helion3.prism.api.storage.StorageAdapterRecords;
-import com.helion3.prism.api.storage.StorageDeleteResult;
-import com.helion3.prism.api.storage.StorageWriteResult;
-import com.helion3.prism.util.DataQueries;
-import com.helion3.prism.util.DataUtil;
-import com.helion3.prism.util.TypeUtil;
-
 public class MySQLRecords implements StorageAdapterRecords {
 
-    private final String tablePrefix = Prism.getInstance().getConfig().getStorageCategory().getTablePrefix();
+    private final String tablePrefix =
+            Prism.getInstance().getConfig().getStorageCategory().getTablePrefix();
 
     @Override
     public StorageWriteResult write(List<DataContainer> containers) throws Exception {
@@ -65,15 +64,26 @@ public class MySQLRecords implements StorageAdapterRecords {
         List<String> extraData = new ArrayList<>();
         Map<Integer, String> extraDataMap = new HashMap<>();
 
-        String sql = String.format("INSERT INTO %srecords(%s, %s, %s, %s, %s, %s, %s, %s, %s)" +
-                        " values(?, ?, UNHEX(?), ?, ?, ?, ?, UNHEX(?), ?)",
-                tablePrefix,
-                DataQueries.Created, DataQueries.EventName, DataQueries.WorldUuid,
-                DataQueries.X, DataQueries.Y, DataQueries.Z,
-                DataQueries.Target, DataQueries.Player, DataQueries.Cause
-        );
+        String sql =
+                String.format(
+                        "INSERT INTO %srecords(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+                                + " values(?, ?, UNHEX(?), ?, ?, ?, ?, UNHEX(?), ?, ?, ?)",
+                        tablePrefix,
+                        DataQueries.Created,
+                        DataQueries.EventName,
+                        DataQueries.WorldUuid,
+                        DataQueries.X,
+                        DataQueries.Y,
+                        DataQueries.Z,
+                        DataQueries.Target,
+                        DataQueries.Player,
+                        DataQueries.Cause,
+                        DataQueries.Captured,
+                        "CaptureSequence");
 
-        try (Connection conn = MySQLStorageAdapter.getConnection(); PreparedStatement statement = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+        try (Connection conn = MySQLStorageAdapter.getConnection();
+                PreparedStatement statement =
+                        conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             conn.setAutoCommit(false);
 
             for (DataContainer container : containers) {
@@ -85,9 +95,16 @@ public class MySQLRecords implements StorageAdapterRecords {
                     playerUUID = TypeUtil.uuidStringToDbString(player.get());
                 }
 
-                statement.setLong( 1, System.currentTimeMillis() / 1000L );
+                long captured =
+                        container.getLong(DataQueries.Captured).orElse(System.currentTimeMillis());
+                statement.setLong(1, captured / 1000L);
+                statement.setLong(10, captured);
+                statement.setLong(11, container.getLong(DataQueries.Sequence).orElse(0L));
                 statement.setObject(2, container.getString(DataQueries.EventName).get());
-                statement.setString(3, TypeUtil.uuidStringToDbString(location.getString(DataQueries.WorldUuid).get()));
+                statement.setString(
+                        3,
+                        TypeUtil.uuidStringToDbString(
+                                location.getString(DataQueries.WorldUuid).get()));
                 statement.setInt(4, location.getInt(DataQueries.X).get());
                 statement.setInt(5, location.getInt(DataQueries.Y).get());
                 statement.setInt(6, location.getInt(DataQueries.Z).get());
@@ -98,6 +115,7 @@ public class MySQLRecords implements StorageAdapterRecords {
 
                 // Remove some data not needed for extra storage
                 container.remove(DataQueries.Location);
+                container.remove(DataQueries.Created);
                 container.remove(DataQueries.EventName);
                 container.remove(DataQueries.Player);
                 container.remove(DataQueries.Cause);
@@ -117,7 +135,9 @@ public class MySQLRecords implements StorageAdapterRecords {
             }
 
             if (containers.size() != extraData.size()) {
-                Prism.getInstance().getLogger().debug("Container has more information than we have extra entries for.");
+                Prism.getInstance()
+                        .getLogger()
+                        .debug("Container has more information than we have extra entries for.");
             }
 
             writeExtraData(extraDataMap);
@@ -126,13 +146,15 @@ public class MySQLRecords implements StorageAdapterRecords {
         return null;
     }
 
-    protected StorageWriteResult writeExtraData(Map<Integer, String> extraDataMap) throws Exception {
+    protected StorageWriteResult writeExtraData(Map<Integer, String> extraDataMap)
+            throws Exception {
         if (extraDataMap.isEmpty()) {
             throw new IllegalArgumentException("Extra data map must not be empty.");
         }
 
         String sql = "INSERT INTO " + tablePrefix + "extra(record_id, json) values(?, ?)";
-        try (Connection conn = MySQLStorageAdapter.getConnection(); PreparedStatement statement = conn.prepareStatement(sql)) {
+        try (Connection conn = MySQLStorageAdapter.getConnection();
+                PreparedStatement statement = conn.prepareStatement(sql)) {
             conn.setAutoCommit(false);
 
             for (Entry<Integer, String> data : extraDataMap.entrySet()) {
@@ -149,7 +171,8 @@ public class MySQLRecords implements StorageAdapterRecords {
     }
 
     @Override
-    public CompletableFuture<List<Result>> query(QuerySession session, boolean translate) throws Exception {
+    public CompletableFuture<List<Result>> query(QuerySession session, boolean translate)
+            throws Exception {
         // Prepare results
         List<Result> results = new ArrayList<>();
         CompletableFuture<List<Result>> future = new CompletableFuture<>();
@@ -159,15 +182,29 @@ public class MySQLRecords implements StorageAdapterRecords {
         SQLQuery query = MySQLQuery.from(session);
         Prism.getInstance().getLogger().debug("MySQL Query: " + query);
 
-        try (Connection conn = MySQLStorageAdapter.getConnection(); PreparedStatement statement = conn.prepareStatement(query.toString()); ResultSet rs = statement.executeQuery()) {
+        try (Connection conn = MySQLStorageAdapter.getConnection();
+                PreparedStatement statement = conn.prepareStatement(query.toString());
+                ResultSet rs = statement.executeQuery()) {
             while (rs.next()) {
                 // Build our result object
-                Result result = Result.from(rs.getString(DataQueries.EventName.toString()), !session.hasFlag(Flag.NO_GROUP));
+                Result result =
+                        Result.from(
+                                rs.getString(DataQueries.EventName.toString()),
+                                !session.hasFlag(Flag.NO_GROUP));
 
                 // Restore the data container
                 DataContainer data = DataContainer.createNew();
                 data.set(DataQueries.EventName, rs.getString(DataQueries.EventName.toString()));
                 data.set(DataQueries.Created, rs.getLong(DataQueries.Created.toString()));
+                if (session.hasFlag(Flag.NO_GROUP)) {
+                    data.set(
+                            org.spongepowered.api.data.DataQuery.of("StorageId"), rs.getLong("id"));
+                    long captured = rs.getLong("Captured");
+                    data.set(
+                            DataQueries.Captured,
+                            captured == 0 ? rs.getLong("Created") * 1000 : captured);
+                    data.set(DataQueries.Sequence, rs.getLong("CaptureSequence"));
+                }
 
                 String target = rs.getString(DataQueries.Target.toString());
                 data.set(DataQueries.Target, target != null ? target : "");
@@ -179,19 +216,27 @@ public class MySQLRecords implements StorageAdapterRecords {
                     loc.set(DataQueries.X, rs.getInt(DataQueries.X.toString()));
                     loc.set(DataQueries.Y, rs.getInt(DataQueries.Y.toString()));
                     loc.set(DataQueries.Z, rs.getInt(DataQueries.Z.toString()));
-                    loc.set(DataQueries.WorldUuid, TypeUtil.uuidStringFromDbString(rs.getString("worldUuidHexed")));
+                    loc.set(
+                            DataQueries.WorldUuid,
+                            TypeUtil.uuidStringFromDbString(rs.getString("worldUuidHexed")));
                     data.set(DataQueries.Location, loc);
 
                     if (rs.getString("json") != null) {
                         try {
-                            JsonObject json = new JsonParser().parse(rs.getString("json")).getAsJsonObject();
+                            JsonObject json =
+                                    new JsonParser().parse(rs.getString("json")).getAsJsonObject();
                             DataView extra = DataUtil.dataViewFromJson(json);
 
                             for (DataQuery key : extra.getKeys(false)) {
                                 data.set(key, extra.get(key).get());
                             }
                         } catch (Exception ex) {
-                            Prism.getInstance().getLogger().error("Failed to deserialize {} at {}", target, loc.toString());
+                            Prism.getInstance()
+                                    .getLogger()
+                                    .error(
+                                            "Failed to deserialize {} at {}",
+                                            target,
+                                            loc.toString());
                             throw ex;
                         }
                     }
@@ -200,6 +245,7 @@ public class MySQLRecords implements StorageAdapterRecords {
                 // Determine the final name of the event source
                 if (rs.getString("playerHexed") != null && !rs.getString("playerHexed").isEmpty()) {
                     UUID uuid = TypeUtil.uuidFromDbString(rs.getString("playerHexed"));
+                    data.set(DataQueries.Player, uuid.toString());
                     data.set(DataQueries.Cause, uuid.toString());
 
                     if (translate) {
@@ -214,7 +260,8 @@ public class MySQLRecords implements StorageAdapterRecords {
             }
 
             if (translate && !uuidsPendingLookup.isEmpty()) {
-                DataUtil.translateUuidsToNames(results, uuidsPendingLookup).thenAccept(future::complete);
+                DataUtil.translateUuidsToNames(results, uuidsPendingLookup)
+                        .thenAccept(future::complete);
             } else {
                 future.complete(results);
             }
@@ -229,4 +276,3 @@ public class MySQLRecords implements StorageAdapterRecords {
         return null;
     }
 }
-

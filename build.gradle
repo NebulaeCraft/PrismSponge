@@ -74,6 +74,11 @@ repositories {
 }
 
 dependencies {
+    // These APIs are supplied by the server. Never shade WE or FAWE into Prism.
+    provided(files(project.findProperty("worldEditJar") ?: "lib/worldedit-forge-mc1.12.2-6.1.10-dist.jar"))
+    provided(files(project.findProperty("faweJar") ?: "lib/FastAsyncWorldEdit-forge112-19.11.13-5505943-1282-22.3.5.jar"))
+    testCompile(files(project.findProperty("worldEditJar") ?: "lib/worldedit-forge-mc1.12.2-6.1.10-dist.jar"))
+    testCompile(files(project.findProperty("faweJar") ?: "lib/FastAsyncWorldEdit-forge112-19.11.13-5505943-1282-22.3.5.jar"))
     shadow("mysql:mysql-connector-java:8.0.19")
     shadow("org.mariadb.jdbc:mariadb-java-client:2.5.4")
     provided("com.zaxxer:HikariCP:3.4.2")
@@ -90,6 +95,10 @@ shadowJar {
     configurations = [project.configurations.shadow]
     relocate("com.mongodb", "com.helion3.prism.lib.mongodb")
     relocate("org.bson", "com.helion3.prism.lib.bson")
+}
+
+tasks.withType(JavaCompile) {
+    options.encoding = "UTF-8"
 }
 
 jar {
